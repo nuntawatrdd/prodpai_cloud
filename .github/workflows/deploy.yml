@@ -70,7 +70,7 @@ jobs:
       - name: Build Flask image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: my-app-repo
+          ECR_REPOSITORY: prodpai_cloud
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
@@ -78,7 +78,7 @@ jobs:
       - name: Run Trivy vulnerability scanner on image
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: '${{ steps.login-ecr.outputs.registry }}/my-app-repo:${{ github.sha }}'
+          image-ref: '${{ steps.login-ecr.outputs.registry }}/prodpai_cloud:${{ github.sha }}'
           format: 'table'
           exit-code: '0' 
           ignore-unfixed: true
@@ -87,7 +87,7 @@ jobs:
       - name: Push Flask image to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: my-app-repo
+          ECR_REPOSITORY: prodpai_cloud
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
