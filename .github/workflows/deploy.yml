@@ -73,7 +73,9 @@ jobs:
           ECR_REPOSITORY: prodpai_cloud
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
 
       - name: Run Trivy vulnerability scanner on image
         uses: aquasecurity/trivy-action@master
@@ -91,6 +93,7 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
       - name: Terminate old instances to trigger ASG
         run: |
