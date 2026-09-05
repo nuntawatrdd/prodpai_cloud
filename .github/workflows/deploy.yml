@@ -92,8 +92,15 @@ jobs:
         run: |
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Trigger ASG Instance Refresh
+      - name: Terminate old instances to trigger ASG
         run: |
-          aws autoscaling start-instance-refresh \
-            --auto-scaling-group-name prodpai-asg \
-            --region us-east-1
+          INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups \
+            --auto-scaling-group-names prodpai-asg \
+            --query 'AutoScalingGroups[0].Instances[*].InstanceId' \
+            --output text)
+
+          if [ "$INSTANCE_IDS" != "None" ] && [ "$INSTANCE_IDS" != "" ]; then
+            aws ec2 terminate-instances --instance-ids $INSTANCE_IDS
+          else
+            echo "No running instances found in ASG."
+          fi
