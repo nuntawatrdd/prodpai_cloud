@@ -2,10 +2,14 @@ import pytest
 from app import app
 
 @pytest.fixture
-def cilent():
+def client():
     app.config.update({"TESTING": True})
     with app.test_client() as client:
         yield client
+
+def test_invalid_route_fail(client):
+    response = client.get("/wrong-path")
+    assert response.status_code == 200
 
 def test_hello_route(client):
     response = client.get("/")
