@@ -17,9 +17,9 @@ resource "local_file" "key" {
   content  = tls_private_key.custom_key.private_key_pem
 }
 
-resource "aws_security_group" "allow_ssh" {
-  name        = "allow-web-instance-sg"
-  description = "Allow web inbound traffic"
+resource "aws_security_group" "allow_web" {
+  name        = "allow-instance-sg"
+  description = "allow inbound traffic"
 
   ingress {
     description = "ssh from anywhere"
@@ -55,15 +55,19 @@ data "aws_ami" "ubuntu" {
   owners = ["099720109477"] # Canonical
 }
 
-resource "aws_instance" "web" {
-  ami                         = data.aws_ami.ubuntu.id
-  instance_type               = "t3.micro"
-  key_name                    = aws_key_pair.generated_key.key_name
-  associate_public_ip_address = true
+resource "aws_launch_template" "prodpai_web_template" {
+  name_prefix   = "prod-pai-template-"
+  image_id      = data.aws_ami.ubuntu.id
+  instance_type = "t3.micro"
+  key_name      = aws_key_pair.generated_key.key_name
 
-  vpc_security_group_ids = [aws_security_group.allow_ssh.id]
+  # sg
+  network_interfaces {
+    associate_public_ip_address = true
+    security_groups             = [aws_security_group.allow_web.id]
+  }
 
-  user_data = <<-EOF
+  user_data = base64encode(<<-EOF
     #!/bin/bash
     apt update -y
     apt install -y nginx
@@ -71,7 +75,23 @@ resource "aws_instance" "web" {
     systemctl enable nginx
     systemctl restart nginx
   EOF
+  )
 
-  user_data_replace_on_change = true
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name = "prod-pai-web"
+    }
+  }
 
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_instance" "web" {
+  launch_template {
+    id      = aws_launch_template.prodpai_web_template.id
+    version = "$Latest"
+  }
 }
