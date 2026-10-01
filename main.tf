@@ -8,12 +8,12 @@ resource "tls_private_key" "custom_key" {
 }
 
 resource "aws_key_pair" "generated_key" {
-  key_name   = "prod-pai-key"
+  key_name   = "${var.project_name}-key"
   public_key = tls_private_key.custom_key.public_key_openssh
 }
 
 resource "local_file" "key" {
-  filename = pathexpand("~/.ssh/prod-pai-key.pem")
+  filename = pathexpand("~/.ssh/${var.project_name}-key.pem")
   content  = tls_private_key.custom_key.private_key_pem
 }
 
@@ -26,21 +26,21 @@ resource "aws_security_group" "allow_web" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.cidr_allow_all
   }
 
   ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.cidr_allow_all
   }
 
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.cidr_allow_all
   }
 }
 
@@ -56,9 +56,9 @@ data "aws_ami" "ubuntu" {
 }
 
 resource "aws_launch_template" "prodpai_web_template" {
-  name_prefix   = "prod-pai-template-"
+  name_prefix   = local.name_prefix
   image_id      = data.aws_ami.ubuntu.id
-  instance_type = "t3.micro"
+  instance_type = var.instance_type
   key_name      = aws_key_pair.generated_key.key_name
 
   # sg
@@ -71,7 +71,7 @@ resource "aws_launch_template" "prodpai_web_template" {
     #!/bin/bash
     apt update -y
     apt install -y nginx
-    echo "<h1>Hello Terraform [prod-pai-cloud]</h1>" > /var/www/html/index.html
+    echo "<h1>Hello Terraform [${local.name_prefix}-cloud]</h1>" > /var/www/html/index.html
     systemctl enable nginx
     systemctl restart nginx
   EOF
@@ -79,9 +79,12 @@ resource "aws_launch_template" "prodpai_web_template" {
 
   tag_specifications {
     resource_type = "instance"
-    tags = {
-      Name = "prod-pai-web"
-    }
+    tags = merge(
+      local.common_tag,
+      {
+        Name = "${local.name_prefix}-instance"
+      }
+    )
   }
 
   lifecycle {

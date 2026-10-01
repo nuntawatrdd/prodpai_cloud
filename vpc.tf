@@ -1,18 +1,24 @@
 resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
 
-  tags = {
-    Name = "prod-pai-vpc"
-  }
+  tags = merge(
+    local.common_tag,
+    {
+      Name = "${var.environment}-vpc"
+    }
+  )
 
 }
 
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
 
-  tags = {
-    Name = "prod-pai-igw"
-  }
+  tags = merge(
+    local.common_tag,
+    {
+      Name = "${var.environment}-igw"
+    }
+  )
 }
 
 resource "aws_subnet" "public_zone1" {
@@ -20,9 +26,12 @@ resource "aws_subnet" "public_zone1" {
   cidr_block        = "10.0.1.0/24"
   availability_zone = "us-east-1a"
 
-  tags = {
-    Name = "prod-pai-public-us-east-1a"
-  }
+  tags = merge(
+    local.common_tag,
+    {
+      Name = "${var.environment}-public-us-east-1a"
+    }
+  )
 }
 
 resource "aws_subnet" "public_zone2" {
@@ -30,9 +39,12 @@ resource "aws_subnet" "public_zone2" {
   cidr_block        = "10.0.11.0/24"
   availability_zone = "us-east-1b"
 
-  tags = {
-    Name = "prod-pai-public-us-east-1b"
-  }
+  tags = merge(
+    local.common_tag,
+    {
+      Name = "${var.environment}-public-us-east-1b"
+    }
+  )
 }
 
 resource "aws_route_table" "public" {
@@ -43,9 +55,12 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.igw.id
   }
 
-  tags = {
-    Name = "prod-pai-public"
-  }
+  tags = merge(
+    local.common_tag,
+    {
+      Name = "${var.environment}-public"
+    }
+  )
 }
 
 resource "aws_route_table_association" "public_zone1" {
@@ -61,18 +76,24 @@ resource "aws_route_table_association" "public_zone2" {
 resource "aws_eip" "nat" {
   domain = "vpc"
 
-  tags = {
-    Name = "prod-pai-nat"
-  }
+  tags = merge(
+    local.common_tag,
+    {
+      Name = "${var.environment}-nat"
+    }
+  )
 }
 
 resource "aws_nat_gateway" "nat" {
   allocation_id = aws_eip.nat.id
   subnet_id     = aws_subnet.public_zone1.id
 
-  tags = {
-    Name = "prod-pai-gw"
-  }
+  tags = merge(
+    local.common_tag,
+    {
+      Name = "${var.environment}-gw"
+    }
+  )
 
   depends_on = [aws_internet_gateway.igw]
 
@@ -83,9 +104,12 @@ resource "aws_subnet" "private_zone1" {
   cidr_block        = "10.0.2.0/24"
   availability_zone = "us-east-1a"
 
-  tags = {
-    Name = "prod-pai-private-us-east-1a"
-  }
+  tags = merge(
+    local.common_tag,
+    {
+      Name = "${var.environment}-private-us-east-1a"
+    }
+  )
 }
 
 resource "aws_subnet" "private_zone2" {
@@ -93,9 +117,12 @@ resource "aws_subnet" "private_zone2" {
   cidr_block        = "10.0.12.0/24"
   availability_zone = "us-east-1b"
 
-  tags = {
-    Name = "prod-pai-private-us-east-1b"
-  }
+  tags = merge(
+    local.common_tag,
+    {
+      Name = "${var.environment}-private-us-east-1b"
+    }
+  )
 }
 
 
@@ -107,9 +134,12 @@ resource "aws_route_table" "private" {
     nat_gateway_id = aws_nat_gateway.nat.id
   }
 
-  tags = {
-    Name = "prod-pai-private"
-  }
+  tags = merge(
+    local.common_tag,
+    {
+      Name = "${var.environment}-private"
+    }
+  )
 }
 
 resource "aws_route_table_association" "private-zone1" {
