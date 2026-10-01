@@ -18,13 +18,20 @@ resource "local_file" "key" {
 }
 
 resource "aws_security_group" "allow_ssh" {
-  name        = "allow-ssh-instance-sg"
-  description = "Allow ssh inbound traffic"
+  name        = "allow-web-instance-sg"
+  description = "Allow web inbound traffic"
 
   ingress {
     description = "ssh from anywhere"
     from_port   = 22
     to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -55,5 +62,16 @@ resource "aws_instance" "web" {
   associate_public_ip_address = true
 
   vpc_security_group_ids = [aws_security_group.allow_ssh.id]
+
+  user_data = <<-EOF
+    #!/bin/bash
+    apt update -y
+    apt install -y nginx
+    echo "<h1>Hello Terraform [prod-pai-cloud]</h1>" > /var/www/html/index.html
+    systemctl enable nginx
+    systemctl restart nginx
+  EOF
+
+  user_data_replace_on_change = true
 
 }
