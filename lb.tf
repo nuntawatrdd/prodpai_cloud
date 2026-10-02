@@ -21,7 +21,7 @@ resource "aws_lb" "lb" {
   }
 }
 
-resource "aws_lb_target_group" "lb-target" {
+resource "aws_lb_target_group" "lb_target" {
   name     = "${local.name_prefix}-lb-target"
   port     = 80
   protocol = "HTTP"
@@ -35,6 +35,6 @@ resource "aws_lb_listener" "lb-listener" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.lb-target.arn
+    target_group_arn = aws_lb_target_group.lb_target.arn
   }
 }

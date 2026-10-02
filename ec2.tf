@@ -19,11 +19,11 @@ resource "aws_launch_template" "prodpai_web_template" {
 
   # sg
   network_interfaces {
-    associate_public_ip_address = true
+    associate_public_ip_address = false
     security_groups             = [aws_security_group.allow_web.id]
   }
 
-  user_data = base64encode("userdata.sh")
+  user_data = filebase64("${path.module}/userdata.sh")
 
   tag_specifications {
     resource_type = "instance"
@@ -40,61 +40,26 @@ resource "aws_launch_template" "prodpai_web_template" {
   }
 }
 
-# Deploy instance
-resource "aws_instance" "web" {
+# # Deploy instance
+# resource "aws_instance" "web" {
+#   launch_template {
+#     id      = aws_launch_template.prodpai_web_template.id
+#     version = "$Latest"
+#   }
+# }
+
+# Auto scaling group for prodpai_web_template
+resource "aws_autoscaling_group" "asg" {
+  name             = "${local.name_prefix}-asg"
+  max_size         = 3
+  min_size         = 2
+  desired_capacity = 2
+
+  target_group_arns   = [aws_lb_target_group.lb_target.arn]
+  vpc_zone_identifier = [for sub in aws_subnet.private_zone : sub.id]
+
   launch_template {
     id      = aws_launch_template.prodpai_web_template.id
     version = "$Latest"
   }
 }
-
-# Auto scaling group for prodpai_web_template
-resource "aws_placement_group" "test" {
-  name     = "test"
-  strategy = "cluster"
-}
-
-# resource "aws_autoscaling_group" "asg" {
-#   name                      = "${local.name_prefix}-asg"
-#   max_size                  = 2
-#   min_size                  = 1
-#   health_check_grace_period = 300
-#   health_check_type         = "ELB"
-#   desired_capacity          = 1
-#   force_delete              = true
-#   placement_group           = aws_placement_group.test.id
-#   launch_configuration      = aws_launch_configuration.foobar.name
-#   vpc_zone_identifier       = aws_subnet.private_zone[*].id
-
-#   initial_lifecycle_hook {
-#     name                 = "foobar"
-#     default_result       = "CONTINUE"
-#     heartbeat_timeout    = 2000
-#     lifecycle_transition = "autoscaling:EC2_INSTANCE_LAUNCHING"
-
-#     notification_metadata = <<EOF
-# {
-#   "foo": "bar"
-# }
-# EOF
-
-#     notification_target_arn = "arn:aws:sqs:us-east-1:444455556666:queue1*"
-#     role_arn                = "arn:aws:iam::123456789012:role/S3Access"
-#   }
-
-#   tag {
-#     key                 = "foo"
-#     value               = "bar"
-#     propagate_at_launch = true
-#   }
-
-#   timeouts {
-#     delete = "15m"
-#   }
-
-#   tag {
-#     key                 = "lorem"
-#     value               = "ipsum"
-#     propagate_at_launch = false
-#   }
-# }

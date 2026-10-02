@@ -2,13 +2,14 @@
 resource "aws_security_group" "allow_web" {
   name        = "allow-instance-sg"
   description = "Allow inbound traffic"
+  vpc_id      = aws_vpc.main.id
 
   ingress {
-    description = "ssh from anywhere"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = var.cidr_allow_all
+    description     = "ssh from anywhere"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.lb_sg.id]
   }
 
   ingress {
@@ -31,6 +32,9 @@ resource "aws_security_group" "allow_web" {
       Name = "${local.name_prefix}-allow-instance"
     }
   )
+
+  depends_on = [aws_security_group.lb_sg]
+
 }
 
 # security group for ALB
