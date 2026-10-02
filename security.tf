@@ -1,3 +1,38 @@
+# security group for accesss web Instance
+resource "aws_security_group" "allow_web" {
+  name        = "allow-instance-sg"
+  description = "Allow inbound traffic"
+
+  ingress {
+    description = "ssh from anywhere"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = var.cidr_allow_all
+  }
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = var.cidr_allow_all
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = var.cidr_allow_all
+  }
+
+  tags = merge(
+    local.common_tag,
+    {
+      Name = "${local.name_prefix}-allow-instance"
+    }
+  )
+}
+
 # security group for ALB
 resource "aws_security_group" "lb_sg" {
   name        = "allow_http-alb"
