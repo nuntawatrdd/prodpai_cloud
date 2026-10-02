@@ -11,6 +11,11 @@ resource "aws_vpc" "main" {
 
 }
 
+# Get are avlilable az form AWS
+data "aws_availability_zones" "available" {
+  state = "avilable"
+}
+
 # Create IGW
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
@@ -29,7 +34,7 @@ resource "aws_subnet" "public_zone" {
 
   vpc_id            = aws_vpc.main.id
   cidr_block        = local.public_subnets[count.index]
-  availability_zone = local.azs[count.index]
+  availability_zone = element(local.azs, count.index)
 
   tags = merge(
     local.common_tag,

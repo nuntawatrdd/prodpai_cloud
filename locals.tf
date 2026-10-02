@@ -3,7 +3,8 @@ locals {
 
   vpc_cdir = "10.0.0.0/16"
 
-  azs            = ["us-east-1a", "us-east-1b"]
+  # availibity zone a-b
+  azs            = slice(data.aws_availability_zones.available.names, 0, 2)
   public_subnets = ["10.0.1.0/24", "10.0.11.0/24"]
 
   private_subnets = {
