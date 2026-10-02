@@ -79,6 +79,9 @@ resource "aws_eip" "nat" {
       Name = "${var.environment}-nat"
     }
   )
+
+  depends_on = [aws_internet_gateway.igw]
+
 }
 
 # Associate an EIP with NAT-gw
@@ -92,9 +95,6 @@ resource "aws_nat_gateway" "nat" {
       Name = "${var.environment}-gw"
     }
   )
-
-  depends_on = [aws_internet_gateway.igw]
-
 }
 
 # Create Private-zone each AZ
