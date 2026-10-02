@@ -13,7 +13,7 @@ resource "aws_vpc" "main" {
 
 # Get are avlilable az form AWS
 data "aws_availability_zones" "available" {
-  state = "avilable"
+  state = "available"
 }
 
 # Create IGW

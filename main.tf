@@ -19,7 +19,7 @@ resource "local_file" "key" {
 
 resource "aws_security_group" "allow_web" {
   name        = "allow-instance-sg"
-  description = "allow inbound traffic"
+  description = "Allow inbound traffic"
 
   ingress {
     description = "ssh from anywhere"
@@ -42,6 +42,14 @@ resource "aws_security_group" "allow_web" {
     protocol    = "-1"
     cidr_blocks = var.cidr_allow_all
   }
+
+  tags = merge(
+    local.common_tag,
+    {
+      Name = "${local.name_prefix}-allow-instance"
+    }
+  )
+
 }
 
 data "aws_ami" "ubuntu" {
