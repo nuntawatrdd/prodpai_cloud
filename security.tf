@@ -5,18 +5,27 @@ resource "aws_security_group" "allow_web" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "ssh from anywhere"
-    from_port       = 22
-    to_port         = 22
-    protocol        = "tcp"
-    security_groups = [aws_security_group.lb_sg.id]
+    description = "ssh from anywhere"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = var.cidr_allow_all
   }
 
   ingress {
+    description     = "HTTP from ALB"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.lb_sg.id] # ใช้ SG ID ของ ALB
+  }
+
+  ingress {
+    description = "HTTP from anywhere for health check script"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = var.cidr_allow_all
+    cidr_blocks = var.cidr_allow_all # ใช้ cidr_blocks สำหรับ IP
   }
 
   egress {
