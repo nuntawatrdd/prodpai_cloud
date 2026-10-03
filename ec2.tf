@@ -33,33 +33,8 @@ resource "null_resource" "wait_for_nginx" {
 
   provisioner "local-exec" {
     interpreter = ["PowerShell", "-Command"]
-    command     = <<EOT
-      $targetIp = "${aws_instance.prodpai_instance.public_ip}"
-      $url = "http://$targetIp/"
-      $maxRetries = 30
-      $count = 0
-
-      Write-Host "Verifying Nginx on $url ..."
-      do {
-        $count++
-        Write-Host "[$count/$maxRetries] Waiting for Nginx..."
-        Start-Sleep -Seconds 10
-        try {
-          $res = Invoke-WebRequest -Uri $url -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
-          $status = $res.StatusCode
-        } catch {
-          $status = 0
-        }
-      } while ($status -ne 200 -and $count -lt $maxRetries)
-
-      if ($status -eq 200) {
-        Write-Host "Nginx is ready! Proceeding with AMI creation."
-        exit 0
-      } else {
-        Write-Error "Timeout waiting for Nginx on $url. Check userdata execution or security group."
-        exit 1
-      }
-    EOT
+    # ใช้ & 'Path' แล้วตามด้วย Arguments โดยตัดเครื่องหมายคำพูดซ้อนออก
+    command = "& '${replace(abspath("${path.module}/nginx.ps1"), "/", "\\")}' -TargetIp ${aws_instance.prodpai_instance.public_ip}"
   }
 }
 
