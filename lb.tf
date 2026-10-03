@@ -1,4 +1,6 @@
-# Create load balancer contain logs into 
+# -----
+# Create Load balancer
+# -----
 resource "aws_lb" "lb" {
   name               = "${local.name_prefix}-lb"
   internal           = false
@@ -21,6 +23,7 @@ resource "aws_lb" "lb" {
   }
 }
 
+# Target instance created by ASG
 resource "aws_lb_target_group" "lb_target" {
   name     = "${local.name_prefix}-lb-target"
   port     = 80
@@ -28,6 +31,7 @@ resource "aws_lb_target_group" "lb_target" {
   vpc_id   = aws_vpc.main.id
 }
 
+# Defined Load balancer listen Target
 resource "aws_lb_listener" "lb-listener" {
   load_balancer_arn = aws_lb.lb.arn
   port              = "80"

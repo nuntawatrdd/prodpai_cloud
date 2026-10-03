@@ -11,6 +11,6 @@
 #   value = "http://${aws_instance.web.public_dns}"
 # }
 
-output "alb_dns" {
-  value = aws_lb.lb.dns_name
+output "lb_domain_name_http" {
+  value = "http://${aws_lb.lb.dns_name}/"
 }

@@ -1,4 +1,4 @@
-# Defined os
+# Defined OS version
 data "aws_ami" "ubuntu" {
   most_recent = true
 
@@ -10,13 +10,15 @@ data "aws_ami" "ubuntu" {
   owners = ["099720109477"] # Canonical
 }
 
-# 1. Create Reference Instance
+# -----
+# Create Reference Instance For launch template
+# -----
 resource "aws_instance" "prodpai_instance" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.instance_type
   subnet_id                   = aws_subnet.public_zone[0].id
   vpc_security_group_ids      = [aws_security_group.allow_web.id]
-  user_data_base64            = filebase64("${path.module}/userdata.sh")
+  user_data_base64            = filebase64("${path.module}/scripts/userdata.sh")
   associate_public_ip_address = true
   iam_instance_profile        = "LabInstanceProfile"
 
@@ -28,17 +30,19 @@ resource "aws_instance" "prodpai_instance" {
   )
 }
 
+# script (wating installing... nginx untill curl 200)
 resource "null_resource" "wait_for_nginx" {
   depends_on = [aws_instance.prodpai_instance]
 
   provisioner "local-exec" {
     interpreter = ["PowerShell", "-Command"]
     # ใช้ & 'Path' แล้วตามด้วย Arguments โดยตัดเครื่องหมายคำพูดซ้อนออก
-    command = "& '${replace(abspath("${path.module}/nginx.ps1"), "/", "\\")}' -TargetIp ${aws_instance.prodpai_instance.public_ip}"
+    command = "& '${replace(abspath("${path.module}/scripts/nginx.ps1"), "/", "\\")}' -TargetIp ${aws_instance.prodpai_instance.public_ip}"
   }
 }
-
-# 3. Snapshot image from prodpai_instance
+# -----
+# Snapshot image from prodpai_instance
+# -----
 resource "aws_ami_from_instance" "web_ami" {
   name               = "${local.name_prefix}-ami"
   source_instance_id = aws_instance.prodpai_instance.id
@@ -46,7 +50,9 @@ resource "aws_ami_from_instance" "web_ami" {
   depends_on = [null_resource.wait_for_nginx]
 }
 
-# 4. Create template with web_ami
+# -----
+# Create template using web_ami
+# -----
 resource "aws_launch_template" "prodpai_web_template" {
   name_prefix   = "${local.name_prefix}-"
   image_id      = aws_ami_from_instance.web_ami.id
@@ -71,13 +77,11 @@ resource "aws_launch_template" "prodpai_web_template" {
       }
     )
   }
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
-# 5. Auto scaling group for prodpai_web_template
+# -----
+# Auto scaling group associate with Load balance
+# -----
 resource "aws_autoscaling_group" "asg" {
   name_prefix      = "${local.name_prefix}-asg-"
   max_size         = 3
@@ -102,9 +106,5 @@ resource "aws_autoscaling_group" "asg" {
       instance_warmup        = 180
     }
     triggers = ["tag"]
-  }
-
-  lifecycle {
-    create_before_destroy = true
   }
 }

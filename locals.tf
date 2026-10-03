@@ -1,4 +1,5 @@
 locals {
+  # prefix name any resource
   name_prefix = "${var.project_name}-${var.environment}"
 
   vpc_cdir = "10.0.0.0/16"
@@ -7,6 +8,7 @@ locals {
   azs            = slice(data.aws_availability_zones.available.names, 0, 2)
   public_subnets = ["10.0.1.0/24", "10.0.11.0/24"]
 
+  # create private as objects
   private_subnets = {
 
     # cidrsubnet(prefix, add_bits, network_addr)
@@ -22,6 +24,7 @@ locals {
 
   }
 
+  # common tag in any resource
   common_tag = merge(
     {
       Project     = var.project_name

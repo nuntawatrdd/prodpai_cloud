@@ -1,4 +1,8 @@
-# Create VPC 'prod-pai-vpc'
+# -----
+# VPC with 2 AZ 
+# one public and private each az
+# has internal-gw for public access and has nat-gw for direch ssh
+# -----
 resource "aws_vpc" "main" {
   cidr_block = local.vpc_cdir
 
