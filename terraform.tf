@@ -42,3 +42,5 @@ resource "local_file" "key" {
   filename = pathexpand("~/.ssh/${var.project_name}-key.pem")
   content  = tls_private_key.custom_key.private_key_pem
 }
+
+# test hook
