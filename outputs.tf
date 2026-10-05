@@ -1,5 +1,5 @@
 # output "ssh_command" {
-#   value       = "ssh -i C:/Users/nunta/.ssh/prod-pai-key.pem ubuntu@${aws_instance.web.public_ip}"
+#   value       = "ssh -i  ubuntu@${aws_instance.test_falco.public_ip}"
 #   description = "Command for SSH into ubuntu"
 # }
 

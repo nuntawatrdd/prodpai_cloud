@@ -24,7 +24,7 @@ variable "cidr_allow_all" {
 
 variable "instance_type" {
   type        = string
-  default     = "t3.micro"
+  default     = "t3.small"
   description = "EC2 instance size"
 
   validation {
