@@ -9,4 +9,4 @@ note.txt
 *.tfstate.backup
 .terraform/
 .terraform.lock.hcl.tmp
-.shh/
+.ssh/
