@@ -44,3 +44,9 @@ variable "extra_tag" {
   default     = {}
   description = "For caller input new tag"
 }
+
+variable "image_tag" {
+  type        = string
+  default     = "latest"
+  description = "Docker image tag to deploy"
+}

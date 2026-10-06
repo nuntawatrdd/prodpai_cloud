@@ -95,15 +95,39 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-      - name: Terminate old instances to trigger ASG
-        run: |
-          INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups \
-            --auto-scaling-group-names prodpai-asg \
-            --query 'AutoScalingGroups[0].Instances[*].InstanceId' \
-            --output text)
+  terraform-deploy:
+    needs: [build-and-push]
+    runs-on: ubuntu-latest
 
-          if [ "$INSTANCE_IDS" != "None" ] && [ "$INSTANCE_IDS" != "" ]; then
-            aws ec2 terminate-instances --instance-ids $INSTANCE_IDS
-          else
-            echo "No running instances found in ASG."
-          fi
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0" 
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -var="image_tag=${{ github.sha }}"
+
+      - name: Export Output and Notify Web API
+        run: |
+          terraform output -json > current_infra.json
+
+          curl -X POST -H "Content-Type: application/json" \
+               -d @current_infra.json \
+               http://your-api.com/api/update
+          
+          echo "✅ Sent infrastructure status to Web API successfully."

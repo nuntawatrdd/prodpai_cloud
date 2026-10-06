@@ -29,4 +29,3 @@ systemctl enable docker
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 696252646855.dkr.ecr.us-east-1.amazonaws.com
 docker pull 696252646855.dkr.ecr.us-east-1.amazonaws.com/prodpai_cloud:latest
 docker run -d -p 8080:8080 --name flask-app --restart always 696252646855.dkr.ecr.us-east-1.amazonaws.com/prodpai_cloud:latest
-

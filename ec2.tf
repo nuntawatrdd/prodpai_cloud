@@ -10,6 +10,10 @@ data "aws_ami" "ubuntu" {
   owners = ["099720109477"] # Canonical
 }
 
+data "aws_ecr_repository" "app_repo" {
+  name = "prodpai_cloud"
+}
+
 # -----
 # Create Reference Instance For launch template
 # -----
@@ -52,6 +56,7 @@ resource "aws_instance" "prodpai_instance" {
 #     command = "& '${replace(abspath("${path.module}/scripts/nginx.ps1"), "/", "\\")}' -TargetIp ${aws_instance.prodpai_instance.public_ip}"
 #   }
 # }
+
 # -----
 # Snapshot image from prodpai_instance
 # -----
@@ -70,7 +75,10 @@ resource "aws_launch_template" "prodpai_web_template" {
   image_id      = aws_ami_from_instance.web_ami.id
   instance_type = var.instance_type
   key_name      = aws_key_pair.generated_key.key_name
-  user_data     = filebase64("${path.module}/scripts/userdata.sh")
+  user_data = base64encode(templatefile("${path.module}/scripts/userdata.sh", {
+    IMAGE_TAG = var.image_tag
+    ECR_URL   = data.aws_ecr_repository.app_repo.repository_url
+  }))
 
   iam_instance_profile {
     name = "LabInstanceProfile"
@@ -90,6 +98,11 @@ resource "aws_launch_template" "prodpai_web_template" {
       }
     )
   }
+
+  lifecycle {
+    ignore_changes = [image_id]
+  }
+
 }
 
 # -----
@@ -120,6 +133,11 @@ resource "aws_autoscaling_group" "asg" {
     }
     triggers = ["tag"]
   }
+
+  lifecycle {
+    ignore_changes = [desired_capacity]
+  }
+
 }
 
 # -----

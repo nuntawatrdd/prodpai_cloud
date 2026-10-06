@@ -4,7 +4,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def hello():
-    return "hello Prodpai Cloud Demo #1"
+    return "hello Prodpai Cloud Terraform with CI/CD"
 
 @app.route('/health')
 def health_check():
