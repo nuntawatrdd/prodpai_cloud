@@ -22,6 +22,13 @@ terraform {
       version = ">= 1.16.3"
     }
   }
+
+  backend "s3" {
+    bucket = "prodpai-tfstate-storage"
+    key    = "prodpai/terraform.tfstate"
+    region = "us-east-1"
+  }
+
 }
 
 # -----
