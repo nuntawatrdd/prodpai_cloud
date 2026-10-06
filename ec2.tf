@@ -132,6 +132,6 @@ resource "null_resource" "terminate_builder" {
   ]
   provisioner "local-exec" {
     interpreter = ["Powershell", "-Command"]
-    command     = "aws ec2 terminate-instance --instance-ids ${aws_instance.prodpai_instance.id} --region us-east-1"
+    command     = "aws ec2 terminate-instances --instance-ids ${aws_instance.prodpai_instance.id} --region us-east-1"
   }
 }

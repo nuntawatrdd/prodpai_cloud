@@ -5,6 +5,9 @@ data "aws_iam_role" "lab_role" {
   name = "LabRole"
 }
 
+# Account ID
+data "aws_caller_identity" "current" {}
+
 # -----
 # Archive a single file
 # -----
@@ -56,5 +59,5 @@ resource "aws_lambda_permission" "allow_falco_cloudwatch" {
   function_name = aws_lambda_function.quarantine_function.function_name
   # "events for eventbridge, logs for cloudwatch"
   principal  = "logs.amazonaws.com"
-  source_arn = "arn:aws:logs:${var.aws_region}:*:log-group:/falco/alerts:*"
+  source_arn = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/falco/alerts:*"
 }
