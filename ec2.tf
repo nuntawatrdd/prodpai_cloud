@@ -70,6 +70,7 @@ resource "aws_launch_template" "prodpai_web_template" {
   image_id      = aws_ami_from_instance.web_ami.id
   instance_type = var.instance_type
   key_name      = aws_key_pair.generated_key.key_name
+  user_data     = filebase64("${path.module}/scripts/userdata.sh")
 
   iam_instance_profile {
     name = "LabInstanceProfile"

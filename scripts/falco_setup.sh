@@ -47,10 +47,6 @@ sudo mkdir -p /etc/falcosidekick
 # fill cred after launch instance
 # -----
 sudo bash -c 'cat << EOF > /etc/falcosidekick/aws.env
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-AWS_SESSION_TOKEN=
 EOF'
 
 # -----
