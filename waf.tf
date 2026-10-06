@@ -4,12 +4,13 @@
 resource "aws_wafv2_web_acl" "web_rate_limit" {
   name        = "${local.name_prefix}-rate-limit"
   description = "WAF rate base rule for access web"
-  scope       = REGIONAL
+  scope       = "REGIONAL"
 
   default_action {
     allow {}
   }
 
+  # send metric to cloudwatch
   visibility_config {
     cloudwatch_metrics_enabled = true
     metric_name                = "${local.name_prefix}_waf_acl"

