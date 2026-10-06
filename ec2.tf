@@ -149,7 +149,7 @@ resource "null_resource" "terminate_builder" {
     aws_launch_template.prodpai_web_template
   ]
   provisioner "local-exec" {
-    interpreter = ["Powershell", "-Command"]
+    interpreter = ["/bin/sh", "-c"]
     command     = "aws ec2 terminate-instances --instance-ids ${aws_instance.prodpai_instance.id} --region us-east-1"
   }
 }
