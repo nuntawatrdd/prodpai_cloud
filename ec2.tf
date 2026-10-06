@@ -78,7 +78,6 @@ resource "aws_launch_template" "prodpai_web_template" {
   user_data = base64encode(templatefile("${path.module}/scripts/userdata.sh", {
     IMAGE_TAG = var.image_tag
     ECR_URL   = data.aws_ecr_repository.app_repo.repository_url
-    ROLE_NAME = data.aws_iam_role.lab_role.name
   }))
 
   iam_instance_profile {
