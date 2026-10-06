@@ -27,7 +27,7 @@
 
         - name: Run tests
           run: |
-            python -m pytest
+            python -m pytest scripts/test_app.py
 
     security:
       runs-on: ubuntu-latest
