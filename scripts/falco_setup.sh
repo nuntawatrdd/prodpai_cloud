@@ -83,3 +83,24 @@ sudo systemctl enable falco-modern-bpf
 sudo systemctl restart falco-modern-bpf
 sudo systemctl enable falcosidekick.service
 sudo systemctl restart falcosidekick
+
+sudo apt-get install -y nginx
+sudo rm -f /var/www/html/index.nginx-debian.html
+sudo rm -f /var/www/html/index.html
+sudo bash -c 'cat << 'EOF' > /var/www/html/index.html
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Prodpai Cloud</title>
+</head>
+<body>
+    <h1>hello Prodpai Cloud</h1>
+</body>
+</html>
+EOF'
+sudo chown www-data:www-data /var/www/html/index.html
+sudo chmod 644 /var/www/html/index.html
+sudo systemctl enable nginx
+sudo systemctl restart nginx
+sudo systemctl status nginx --no-pager
