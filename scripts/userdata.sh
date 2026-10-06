@@ -1,10 +1,6 @@
-#!/bin/bash
-    apt update -y
-    apt install -y nginx
-    rm -rf /var/www/html/*
-    
-    echo "<h1>Hello Terraform [${local.name_prefix}-cloud]</h1>" > /var/www/html/index.html
-    systemctl enable nginx
-    systemctl restart nginx
+# 1. ดึง Instance ID ของตัวเองจาก IMDS (Metadata)
+TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+INSTANCE_ID=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/instance-id)
 
-    echo "READY" > /var/www/html/ready.txt
+# 2. ตั้งชื่อเครื่อง (Hostname) ให้กลายเป็น Instance ID
+sudo hostnamectl set-hostname $INSTANCE_ID

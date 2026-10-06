@@ -1,4 +1,6 @@
+# -----
 # security group for accesss web Instance
+# -----
 resource "aws_security_group" "allow_web" {
   name        = "allow-instance-sg"
   description = "Allow inbound traffic"
@@ -17,7 +19,7 @@ resource "aws_security_group" "allow_web" {
     from_port       = 80
     to_port         = 80
     protocol        = "tcp"
-    security_groups = [aws_security_group.lb_sg.id] # ใช้ SG ID ของ ALB
+    security_groups = [aws_security_group.lb_sg.id]
   }
 
   ingress {
@@ -25,7 +27,7 @@ resource "aws_security_group" "allow_web" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = var.cidr_allow_all # ใช้ cidr_blocks สำหรับ IP
+    cidr_blocks = var.cidr_allow_all
   }
 
   egress {
@@ -46,7 +48,9 @@ resource "aws_security_group" "allow_web" {
 
 }
 
+# -----
 # security group for ALB
+# -----
 resource "aws_security_group" "lb_sg" {
   name        = "allow_http-alb"
   description = "Allow http inbound traffic"
@@ -72,4 +76,16 @@ resource "aws_security_group" "lb_sg" {
       Name = "${local.name_prefix}-allow_alb"
     }
   )
+}
+
+# -----
+# qaurantine security group
+# -----
+resource "aws_security_group" "falco_sg" {
+  name        = "deny_any_any"
+  description = "Deny any port any IP for quarantine instance"
+  vpc_id      = aws_vpc.main.id
+
+  ingress = []
+  egress  = []
 }

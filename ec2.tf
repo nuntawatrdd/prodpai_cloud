@@ -120,3 +120,17 @@ resource "aws_autoscaling_group" "asg" {
     triggers = ["tag"]
   }
 }
+
+# -----
+# Terminate Resource
+# -----
+resource "null_resource" "terminate_builder" {
+  depends_on = [
+    aws_autoscaling_group.asg,
+    aws_launch_template.prodpai_web_template
+  ]
+  provisioner "local-exec" {
+    interpreter = ["Powershell", "-Command"]
+    command     = "aws ec2 terminate-instance --instance-ids ${aws_instance.prodpai_instance.id} --region us-east-1"
+  }
+}
