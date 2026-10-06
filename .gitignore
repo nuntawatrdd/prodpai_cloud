@@ -10,3 +10,4 @@ note.txt
 .terraform/
 .terraform.lock.hcl.tmp
 .ssh/
+.insert_cred
