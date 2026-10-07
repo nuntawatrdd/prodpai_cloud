@@ -121,7 +121,7 @@
 
         - name: Import Updated HashiCorp GPG Key
           run: |
-            curl -fsSL https://www.hashicorp.com/official-gpg-key | gpg --import -
+            curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --import -
 
         - name: Create SSH Key for Provisioner
           run: |
