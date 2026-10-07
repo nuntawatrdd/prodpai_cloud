@@ -115,8 +115,8 @@
         - name: Setup Terraform
           uses: hashicorp/setup-terraform@v3
           with:
-            terraform_version: "1.5.0" 
-            
+            terraform_version: 1.6.0
+
         - name: Create SSH Key for Provisioner
           run: |
             mkdir -p .ssh
@@ -138,3 +138,4 @@
                 https://dashboard-prod-pai-cloud.onrender.com/api/update
             
             echo "✅ Sent infrastructure status to Web API successfully."
+  
