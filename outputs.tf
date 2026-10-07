@@ -16,102 +16,83 @@ output "lb_domain_name_http" {
 }
 
 output "infrastructure_summary" {
-  description = "Detailed summary of all provisioned resources mapping exactly to the requested JSON structure, with safe fallbacks"
+  description = "Detailed summary of all provisioned resources for the Web Dashboard"
   value = {
-    # ใช้ try เผื่อบางตัวแปรชื่อไม่ตรงกัน หรือไม่มีอยู่จริง
-    project     = try(var.project_name, var.project_name, null)
-    environment = try(var.environment, null)
-    region      = try(var.aws_region, var.aws_region, null)
-    tags        = try(local.common_tag, local.common_tag, {})
+    # ข้อมูล Meta (ถ้าไม่มีตัวแปร var พวกนี้ในโค้ด ให้แก้เป็น String ธรรมดาได้เลย เช่น "prodpai-cloud")
+    project     = var.project_name
+    environment = var.environment
+    region      = var.aws_region
 
-    vpc = try({
+    vpc = {
       id         = aws_vpc.main.id
-      name       = try(aws_vpc.main.tags["Name"], "vpc")
+      name       = try(aws_vpc.main.tags["Name"], "prodpai-prod-vpc")
       cidr_block = aws_vpc.main.cidr_block
-    }, null)
+    }
 
-    # รวม Subnet ทั้ง Public และ Private เข้าด้วยกันเป็น Array เดียว (ถ้าไม่มีจะกลายเป็น list ว่าง [])
+    # แปลง Subnet ให้เป็น Array of Objects ตามที่เว็บต้องการ
     subnets = concat(
-      try([for s in aws_subnet.public : {
+      [for s in aws_subnet.public_zone : {
         id                = s.id
         name              = try(s.tags["Name"], s.id)
         cidr_block        = s.cidr_block
         availability_zone = s.availability_zone
         tags              = { Tier = "public" }
-      }], []),
-      try([for s in aws_subnet.private : {
+      }],
+      [for s in aws_subnet.private_zone : {
         id                = s.id
         name              = try(s.tags["Name"], s.id)
         cidr_block        = s.cidr_block
         availability_zone = s.availability_zone
         tags              = { Tier = "private" }
-      }], [])
+      }]
     )
 
-    nat_gateways = try([for nat in aws_nat_gateway.main : {
-      id                = nat.id
-      name              = try(nat.tags["Name"], nat.id)
-      public_ip         = try(nat.public_ip, null)
-      private_ip        = try(nat.private_ip, null)
-      availability_zone = try(aws_subnet.public[nat.subnet_id].availability_zone, null)
-    }], [])
-
-    waf = try({
-      id         = aws_wafv2_web_acl.main.id
-      name       = aws_wafv2_web_acl.main.name
-      rule_count = length(aws_wafv2_web_acl.main.rule)
-    }, null)
-
-    load_balancer = try({
-      name               = aws_lb.main.name
-      dns_name           = aws_lb.main.dns_name
-      load_balancer_type = aws_lb.main.load_balancer_type
-      scheme             = aws_lb.main.internal ? "internal" : "internet-facing"
+    load_balancer = {
+      name               = aws_lb.lb.name
+      dns_name           = aws_lb.lb.dns_name
+      load_balancer_type = aws_lb.lb.load_balancer_type
+      scheme             = aws_lb.lb.internal ? "internal" : "internet-facing"
       state              = "active"
-    }, null)
+    }
 
-    target_group = try({
-      name = aws_lb_target_group.main.name
-      port = aws_lb_target_group.main.port
-    }, null)
+    waf = {
+      id         = aws_wafv2_web_acl.web_rate_limit.id
+      name       = aws_wafv2_web_acl.web_rate_limit.name
+      rule_count = length(aws_wafv2_web_acl.web_rate_limit.rule)
+    }
 
-    # ค้นหา Security Group ถ้าตัวไหนไม่มี จะส่งค่ากลับเป็น null
-    security_groups = try({
-      alb    = try(aws_security_group.alb_sg.id, aws_security_group.lb_sg.id, null)
-      ec2    = try(aws_security_group.ec2_sg.id, aws_security_group.allow_web.id, null)
-      lambda = try(aws_security_group.lambda_sg.id, null)
-    }, null)
-
-    auto_scaling = try({
+    auto_scaling = {
       name             = aws_autoscaling_group.asg.name
       desired_capacity = aws_autoscaling_group.asg.desired_capacity
       min_size         = aws_autoscaling_group.asg.min_size
       max_size         = aws_autoscaling_group.asg.max_size
-    }, null)
+    }
 
-    ec2_instances = try([for inst in aws_instance.web : {
-      id                = inst.id
-      name              = try(inst.tags["Name"], inst.id)
-      status            = inst.instance_state
-      instance_type     = inst.instance_type
-      private_ip        = inst.private_ip
-      availability_zone = inst.availability_zone
-      tags              = try(inst.tags, {})
-    }], [])
+    target_group = {
+      name                 = aws_lb_target_group.lb_target.name
+      port                 = aws_lb_target_group.lb_target.port
+      health_check_path    = aws_lb_target_group.lb_target.health_check[0].path
+      health_check_matcher = aws_lb_target_group.lb_target.health_check[0].matcher
+    }
 
-    image_builder = try({
-      instance_id   = aws_instance.builder.id
+    launch_template = {
+      name = aws_launch_template.prodpai_web_template.name
+    }
+
+    image_builder = {
       ami_id        = aws_ami_from_instance.web_ami.id
-      instance_type = aws_instance.builder.instance_type
-      status        = aws_instance.builder.instance_state
-      tags          = try(aws_instance.builder.tags, {})
-    }, null)
+      instance_id   = aws_instance.prodpai_instance.id
+      instance_type = try(aws_instance.prodpai_instance.instance_type, "unknown")
+      status        = aws_instance.prodpai_instance.instance_state
+      tags          = try(aws_instance.prodpai_instance.tags, { Role = "ami-builder" })
+    }
 
-    lambda_functions = try([for fn in aws_lambda_function.functions : {
-      name        = fn.function_name
-      runtime     = fn.runtime
-      memory_size = fn.memory_size
-      tags        = try(fn.tags, {})
-    }], [])
+    security_groups = {
+      alb        = aws_security_group.lb_sg.id
+      instance   = aws_security_group.allow_web.id
+      quarantine = aws_security_group.falco_sg.id
+    }
+
+    update_time = timestamp()
   }
 }
