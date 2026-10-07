@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Prodpai Cloud - Infrastructure</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist@5/index.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist-mono@5/index.css">
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        bg: 'var(--bg)', surface: 'var(--surface)', raised: 'var(--raised)',
+                        line: 'var(--line)', ink: 'var(--ink)', muted: 'var(--muted)',
+                        accent: 'var(--accent)', 'accent-ink': 'var(--accent-ink)',
+                        ok: 'var(--ok)', warn: 'var(--warn)', idle: 'var(--idle)'
+                    },
+                    fontFamily: {
+                        sans: ['"Geist Variable"', 'Geist', 'system-ui', 'sans-serif'],
+                        mono: ['"Geist Mono Variable"', '"Geist Mono"', 'ui-monospace', 'monospace']
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        :root {
+            --bg: #f3f4f6; --surface: #fcfcfd; --raised: #eceef1; --line: #dde1e6;
+            --ink: #14171c; --muted: #566070; --accent: #1f5fd6; --accent-ink: #fcfcfd;
+            --ok: #0f7a56; --warn: #9a5800; --idle: #6b7482; color-scheme: light;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --bg: #0b0d10; --surface: #12151a; --raised: #191d24; --line: #262c36;
+                --ink: #e7eaee; --muted: #929ba8; --accent: #6aa5ff; --accent-ink: #0b0d10;
+                --ok: #3ecf8e; --warn: #f0b429; --idle: #7a8492; color-scheme: dark;
+            }
+        }
+        :root[data-theme="dark"] {
+            --bg: #0b0d10; --surface: #12151a; --raised: #191d24; --line: #262c36;
+            --ink: #e7eaee; --muted: #929ba8; --accent: #6aa5ff; --accent-ink: #0b0d10;
+            --ok: #3ecf8e; --warn: #f0b429; --idle: #7a8492; color-scheme: dark;
+        }
+        body { background: var(--bg); color: var(--ink); }
+        .num { font-variant-numeric: tabular-nums; }
+        :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .press:active { transform: translateY(1px); }
+        @media (prefers-reduced-motion: no-preference) {
+            .spin { animation: spin 0.8s linear infinite; }
+            .press { transition: background-color 0.15s, border-color 0.15s, transform 0.1s; }
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #diagram svg { max-width: 100%; height: auto; }
+    </style>
+</head>
+<body class="font-sans min-h-[100dvh] antialiased">
+    <header class="sticky top-0 z-20 border-b border-line bg-bg">
+        <div class="max-w-[1400px] mx-auto px-4 lg:px-6 h-16 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3 min-w-0">
+                <i class="ph ph-cloud text-2xl text-accent" aria-hidden="true"></i>
+                <div class="min-w-0">
+                    <h1 class="text-base font-semibold leading-tight truncate">Prodpai Cloud Infrastructure</h1>
+                    <p class="text-xs text-muted truncate">Last update: <span id="update-time" class="font-mono num text-ink">loading</span></p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <span id="source-badge" class="hidden sm:inline-flex items-center rounded-full border border-line px-2.5 py-1 text-xs text-muted"></span>
+                <span id="conn" class="hidden md:inline-flex items-center gap-1.5 text-xs text-muted whitespace-nowrap">
+                    <span id="conn-dot" class="h-1.5 w-1.5 rounded-full" style="background:var(--idle)"></span>
+                    <span id="conn-text">Connecting</span>
+                </span>
+                <button id="refresh-btn" type="button" class="press inline-flex items-center gap-2 rounded-lg bg-accent text-accent-ink px-3 h-9 text-sm font-medium whitespace-nowrap">
+                    <i id="refresh-icon" class="ph ph-arrows-clockwise text-base" aria-hidden="true"></i>
+                    <span class="hidden sm:inline">Refresh</span>
+                </button>
+                <button id="theme-btn" type="button" aria-label="Switch color theme" class="press inline-flex items-center justify-center rounded-lg border border-line h-9 w-9 hover:bg-raised">
+                    <i class="ph ph-circle-half text-base" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1400px] mx-auto px-4 lg:px-6 py-6 space-y-6">
+        <div id="notice" class="hidden rounded-xl border border-line bg-surface px-4 py-3 text-sm flex items-start gap-3">
+            <i id="notice-icon" class="ph ph-info text-lg text-accent mt-0.5" aria-hidden="true"></i>
+            <div class="min-w-0">
+                <p id="notice-title" class="font-medium"></p>
+                <p id="notice-text" class="text-muted break-words"></p>
+            </div>
+        </div>
+        <div id="error" class="hidden rounded-xl border border-warn bg-surface px-4 py-3 text-sm flex items-start gap-3">
+            <i class="ph ph-warning text-lg text-warn mt-0.5" aria-hidden="true"></i>
+            <p id="error-text" class="flex-1"></p>
+            <button id="retry-btn" type="button" class="press underline underline-offset-2">Try again</button>
+        </div>
+
+        <!-- Topology and raw data (Adjusted to 50/50 split for focus) -->
+        <section aria-label="Architecture" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="rounded-xl border border-line bg-surface p-5 overflow-x-auto min-h-[600px]">
+                <h2 class="text-sm font-semibold">Architecture diagram</h2>
+                <div id="diagram" class="mt-4 flex justify-center text-sm text-muted">Loading diagram</div>
+            </div>
+            <div class="rounded-xl border border-line bg-surface p-5 flex flex-col max-h-[800px]">
+                <h2 class="text-sm font-semibold">Incoming JSON data</h2>
+                <pre id="json-log" class="mt-4 flex-1 overflow-auto rounded-lg bg-bg border border-line p-3 text-xs font-mono whitespace-pre-wrap break-words">Waiting for data</pre>
+            </div>
+        </section>
+
+        <p id="checked" class="text-xs text-muted num"></p>
+        <div id="live" class="sr-only" aria-live="polite"></div>
+    </main>
+
+    <script type="module">
+        const HEALTH_COLOR = { healthy: 'var(--ok)', warning: 'var(--warn)', inactive: 'var(--idle)', unknown: 'var(--idle)' };
+        const $ = (id) => document.getElementById(id);
+        const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+        const state = { data: null, version: null, busy: false, timer: null, diagramRun: 0 };
+
+        const STATE_UI = {
+            live: { icon: 'ph-info', tone: 'accent' },
+            waiting: { icon: 'ph-hourglass', tone: 'accent' },
+            writing: { icon: 'ph-arrows-clockwise', tone: 'accent', spin: true },
+            invalid: { icon: 'ph-warning', tone: 'warn' },
+            schema: { icon: 'ph-warning', tone: 'warn' }
+        };
+        const SOURCE_LABEL = { live: 'Live file', stale: 'Previous data', mock: 'Sample data', none: 'No data yet' };
+
+        const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+        const text = (v, fallback = '') => (v === null || v === undefined || typeof v === 'object' ? fallback : String(v));
+
+        function sanitize(input) {
+            const d = obj(input);
+            const resources = (Array.isArray(d.resources) ? d.resources : [])
+                .filter((r) => r && typeof r === 'object' && !Array.isArray(r))
+                .map((r) => ({
+                    id: text(r.id, 'unknown'),
+                    name: text(r.name, text(r.id, 'unnamed')),
+                    type: text(r.type, 'unknown'),
+                    status: text(r.status, 'unknown'),
+                    health: HEALTH_COLOR[r.health] ? r.health : 'unknown',
+                    spec: text(r.spec)
+                }));
+            return {
+                state: STATE_UI[d.state] ? d.state : 'waiting',
+                source: SOURCE_LABEL[d.source] ? d.source : 'none',
+                version: text(d.version, String(Date.now())),
+                message: text(d.message), detail: text(d.detail),
+                update_time: text(d.update_time),
+                resources,
+                raw: d.raw === undefined ? null : d.raw
+            };
+        }
+
+        // ---------- data loading & SSE ----------
+        async function load(manual = false) {
+            if (state.busy) { state.again = true; return; }
+            state.busy = true;
+            $('refresh-icon').classList.add('spin');
+            try {
+                const headers = state.version && !manual ? { 'If-None-Match': state.version } : {};
+                const res = await fetch('/api/data', { headers, cache: 'no-store' });
+                if (res.status !== 304) {
+                    if (!res.ok) throw new Error(`The server responded with status ${res.status}.`);
+                    const data = sanitize(await res.json());
+                    const changed = state.version !== null && data.version !== state.version;
+                    state.data = data;
+                    state.version = data.version;
+                    render();
+                    if (changed) {
+                        $('live').textContent = data.state === 'live' ? 'Data updated.' : data.message;
+                    }
+                }
+                $('error').classList.add('hidden');
+                $('checked').textContent = `Data checked at ${new Date().toLocaleTimeString()}. Auto-updates are active.`;
+            } catch (err) {
+                const detail = err instanceof TypeError ? 'Server unreachable.' : err.message;
+                $('error-text').textContent = `Could not load data. ${detail}`;
+                $('error').classList.remove('hidden');
+            } finally {
+                state.busy = false;
+                $('refresh-icon').classList.remove('spin');
+                if (state.again) { state.again = false; load(false); }
+            }
+        }
+
+        function setConnection(live) {
+            $('conn-dot').style.background = live ? 'var(--ok)' : 'var(--warn)';
+            $('conn-text').textContent = live ? 'Watching for updates' : 'Reconnecting';
+        }
+
+        function connect() {
+            if (!window.EventSource) {
+                $('conn-text').textContent = 'Polling every 5s';
+                setInterval(() => load(false), 5000);
+                return;
+            }
+            const source = new EventSource('/api/events');
+            source.onopen = () => { setConnection(true); load(false); };
+            source.addEventListener('change', () => load(false));
+            source.onerror = () => setConnection(false);
+        }
+
+        // ---------- rendering ----------
+        function render() {
+            try { renderHeader(); } catch (err) { console.error(err); }
+            try { renderRaw(); } catch (err) { console.error(err); }
+            try { renderDiagram(); } catch (err) { console.error(err); }
+        }
+
+        function renderHeader() {
+            const d = state.data;
+            $('update-time').textContent = d.update_time || 'No data';
+            const badge = $('source-badge');
+            badge.textContent = SOURCE_LABEL[d.source];
+            badge.classList.remove('hidden');
+            badge.classList.add('sm:inline-flex');
+
+            const ui = STATE_UI[d.state];
+            $('notice-icon').className = `ph ${ui.icon} text-lg mt-0.5${ui.spin ? 'spin' : ''}`;
+            $('notice-icon').style.color = `var(--${ui.tone})`;
+            $('notice-title').textContent = d.message;
+            $('notice-text').textContent = d.detail;
+            $('notice').classList.toggle('hidden', !d.message && !d.detail);
+        }
+
+        function renderRaw() {
+            const raw = state.data.raw;
+            $('json-log').textContent = raw === null ? 'Waiting for Terraform state...' : JSON.stringify(raw, null, 2);
+        }
+
+        function diagramDefinition(resources) {
+            const of = (type) => resources.filter((r) => r.type === type);
+            const label = (v) => String(v ?? '').replace(/["`<>{}\[\]()|#;]/g, ' ').trim();
+            const lines = ['graph TD', 'NET(["Internet"])'];
+            let entry = 'NET';
+            const link = (id, shape) => { lines.push(shape, `${entry} --> ${id}`); entry = id; };
+
+            const waf = of('aws_wafv2_web_acl')[0], lb = of('aws_lb')[0], asg = of('aws_autoscaling_group')[0];
+            if (waf) link('WAF', `WAF["AWS WAF<br/>${label(waf.name)}"]`);
+            if (lb) link('ALB', `ALB["Load balancer<br/>${label(lb.name)}"]`);
+            if (asg) link('ASG', `ASG[["Auto Scaling group<br/>${label(asg.name)}<br/>${label(asg.spec)}"]]`);
+
+            const instances = of('aws_instance'), vpc = of('aws_vpc')[0];
+            if (instances.length) {
+                lines.push(`subgraph VPC["VPC ${label(vpc ? vpc.id : '')}"]`);
+                instances.forEach((r, i) => lines.push(`EC2_${i}["${label(r.name)}<br/>${label(r.id)}<br/>${label(r.status)}"]`));
+                lines.push('end');
+                instances.forEach((r, i) => { if (r.health !== 'inactive') lines.push(`${entry} --> EC2_${i}`); });
+            }
+            const lambdas = of('aws_lambda_function');
+            if (lambdas.length) {
+                lines.push('CW(("CloudWatch"))');
+                lambdas.forEach((r, i) => lines.push(`FN_${i}["Lambda<br/>${label(r.name)}"]`, `CW -.->|Alert| FN_${i}`));
+            }
+            const buckets = of('aws_s3_bucket');
+            if (buckets.length) {
+                lines.push('subgraph S3["S3 buckets"]');
+                buckets.forEach((r, i) => lines.push(`BKT_${i}[("${label(r.name)}")]`));
+                lines.push('end');
+            }
+            return lines.join('\n');
+        }
+
+        let mermaidModule = null;
+        async function renderDiagram() {
+            const el = $('diagram'), run = ++state.diagramRun;
+            if (!state.data.resources.length) { el.textContent = 'Waiting for Terraform state. Nothing to draw yet.'; return; }
+            try {
+                if (!mermaidModule) {
+                    mermaidModule = (await import('https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs')).default;
+                }
+                const dark = cssVar('--bg') === '#0b0d10';
+                mermaidModule.initialize({ startOnLoad: false, securityLevel: 'strict', theme: dark ? 'dark' : 'neutral' });
+                const { svg } = await mermaidModule.render(`diagram-svg-${run}`, diagramDefinition(state.data.resources));
+                if (run === state.diagramRun) el.innerHTML = svg;
+            } catch (err) {
+                console.error('Diagram rendering failed:', err);
+                if (run === state.diagramRun) el.textContent = 'Diagram rendering failed. See console for details.';
+            }
+        }
+
+        // ---------- interactions ----------
+        $('refresh-btn').addEventListener('click', () => load(true));
+        $('retry-btn').addEventListener('click', () => load(true));$('theme-btn').addEventListener('click', () => {
+            const dark = cssVar('--bg') === '#0b0d10';
+            const next = dark ? 'light' : 'dark';
+            document.documentElement.dataset.theme = next;
+            try { localStorage.setItem('theme', next); } catch (_) {}
+            if (state.data) renderDiagram();
+        });
+        
+        try {
+            const saved = localStorage.getItem('theme');
+            if (saved === 'light' || saved === 'dark') document.documentElement.dataset.theme = saved;
+        } catch (_) {}
+
+        load(true);
+        connect();
+    </script>
+</body>
+</html>
