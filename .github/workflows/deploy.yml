@@ -112,16 +112,10 @@
             aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
             aws-region: us-east-1
 
-        - name: Pre-install Terraform Binary
-          run: |
-            wget -q "https://releases.hashicorp.com/terraform/1.6.0/terraform_1.6.0_linux_amd64.zip" -O /tmp/terraform.zip
-            unzip -o /tmp/terraform.zip -d /usr/local/bin/
-            chmod +x /usr/local/bin/terraform
-            rm -f /tmp/terraform.zip
-
-        - name: Import Updated HashiCorp GPG Key
-          run: |
-            curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --import -
+        - name: Set Up Terraform
+          uses: hashicorp/setup-terraform@v3
+          with:
+            terraform_version: 1.9.8
 
         - name: Create SSH Key for Provisioner
           run: |
