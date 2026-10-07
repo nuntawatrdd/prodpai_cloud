@@ -115,7 +115,7 @@
         - name: Setup Terraform
           uses: hashicorp/setup-terraform@v3
           with:
-            terraform_version: 1.6.0
+            terraform_version: "1.6.0"
 
         - name: Create SSH Key for Provisioner
           run: |
@@ -124,10 +124,10 @@
             chmod 600 .ssh/fcfalco.pem
 
         - name: Clean Terraform Cache & Lock
-          run: rm -f .terraform.lock.hcl
+          run: rm -rf .terraform .terraform.lock.hcl
 
         - name: Terraform Init
-          run: terraform init -upgrade
+          run: terraform init
 
         - name: Terraform Apply
           run: terraform apply -auto-approve -var="image_tag=${{ github.sha }}"
