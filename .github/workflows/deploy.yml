@@ -111,13 +111,17 @@
             aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
             aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
             aws-region: us-east-1
-            
+
         - name: Pre-install Terraform Binary
           run: |
             wget -q "https://releases.hashicorp.com/terraform/1.6.0/terraform_1.6.0_linux_amd64.zip" -O /tmp/terraform.zip
             unzip -o /tmp/terraform.zip -d /usr/local/bin/
             chmod +x /usr/local/bin/terraform
             rm -f /tmp/terraform.zip
+
+        - name: Import Updated HashiCorp GPG Key
+          run: |
+            curl -fsSL https://www.hashicorp.com/official-gpg-key | gpg --import -
 
         - name: Create SSH Key for Provisioner
           run: |
@@ -136,11 +140,10 @@
 
         - name: Export Output and Notify Web API
           run: |
-            terraform output -json infrastructure_summary > current_infra.json
+            terraform output -json infrastructure_summary > currentinfra.json
 
             curl -X POST -H "Content-Type: application/json" \
-                -d @current_infra.json \
+                -d @currentinfra.json \
                 https://dashboard-prod-pai-cloud.onrender.com/api/update
             
             echo "✅ Sent infrastructure status to Web API successfully."
-  
