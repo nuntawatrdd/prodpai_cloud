@@ -483,7 +483,7 @@ def get_snapshot():
             "data_path": data_path,
             "applying": applying,
             "watching": [display_path(p) for p in paths],
-            "version": hashlib.sha1(f"{state}|{source}|{signature}".encode()).hexdigest()[:16],
+            "version": hashlib.sha256(f"{state}|{source}|{signature}".encode()).hexdigest()[:16],
         }
         _snapshot_cache.update(signature=signature, snapshot=snapshot)
         return snapshot
@@ -678,4 +678,5 @@ def dashboard():
 
 if __name__ == '__main__':
     debug = os.environ.get("FLASK_DEBUG", "0") == "1"
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=debug, threaded=True)
+    host = os.environ.get("HOST", "127.0.0.1")
+    app.run(host=host, port=int(os.environ.get("PORT", 5000)), debug=debug, threaded=True)
