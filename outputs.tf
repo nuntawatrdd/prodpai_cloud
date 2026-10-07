@@ -113,12 +113,5 @@ output "infrastructure_summary" {
       memory_size = fn.memory_size
       tags        = try(fn.tags, {})
     }], [])
-
-    s3_buckets = try([for b in aws_s3_bucket.buckets : {
-      name       = b.bucket
-      size_gb    = null
-      versioning = try(aws_s3_bucket_versioning.buckets[b.id].versioning_configuration[0].status, "disabled")
-      tags       = try(b.tags, {})
-    }], [])
   }
 }
