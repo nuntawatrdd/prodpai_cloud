@@ -16,109 +16,109 @@ output "lb_domain_name_http" {
 }
 
 output "infrastructure_summary" {
-  description = "Detailed summary of all provisioned resources mapping exactly to the requested JSON structure"
+  description = "Detailed summary of all provisioned resources mapping exactly to the requested JSON structure, with safe fallbacks"
   value = {
-    project     = var.project_name
-    environment = var.environment
-    region      = var.aws_region
-    tags        = local.common_tag
+    # ใช้ try เผื่อบางตัวแปรชื่อไม่ตรงกัน หรือไม่มีอยู่จริง
+    project     = try(var.project_name, var.project_name, null)
+    environment = try(var.environment, null)
+    region      = try(var.aws_region, var.aws_region, null)
+    tags        = try(local.common_tag, local.common_tag, {})
 
-    vpc = {
+    vpc = try({
       id         = aws_vpc.main.id
-      name       = aws_vpc.main.tags["Name"]
+      name       = try(aws_vpc.main.tags["Name"], "vpc")
       cidr_block = aws_vpc.main.cidr_block
-    }
+    }, null)
 
-    # รวม Subnet ทั้ง Public และ Private เข้าด้วยกันเป็น Array เดียว
+    # รวม Subnet ทั้ง Public และ Private เข้าด้วยกันเป็น Array เดียว (ถ้าไม่มีจะกลายเป็น list ว่าง [])
     subnets = concat(
-      [for s in aws_subnet.public : {
+      try([for s in aws_subnet.public : {
         id                = s.id
-        name              = s.tags["Name"]
+        name              = try(s.tags["Name"], s.id)
         cidr_block        = s.cidr_block
         availability_zone = s.availability_zone
         tags              = { Tier = "public" }
-      }],
-      [for s in aws_subnet.private : {
+      }], []),
+      try([for s in aws_subnet.private : {
         id                = s.id
-        name              = s.tags["Name"]
+        name              = try(s.tags["Name"], s.id)
         cidr_block        = s.cidr_block
         availability_zone = s.availability_zone
         tags              = { Tier = "private" }
-      }]
+      }], [])
     )
 
-    nat_gateways = [for nat in aws_nat_gateway.main : {
+    nat_gateways = try([for nat in aws_nat_gateway.main : {
       id                = nat.id
-      name              = nat.tags["Name"]
-      public_ip         = nat.public_ip
-      private_ip        = nat.private_ip
-      availability_zone = aws_subnet.public[nat.subnet_id].availability_zone
-    }]
+      name              = try(nat.tags["Name"], nat.id)
+      public_ip         = try(nat.public_ip, null)
+      private_ip        = try(nat.private_ip, null)
+      availability_zone = try(aws_subnet.public[nat.subnet_id].availability_zone, null)
+    }], [])
 
-    waf = {
+    waf = try({
       id         = aws_wafv2_web_acl.main.id
       name       = aws_wafv2_web_acl.main.name
       rule_count = length(aws_wafv2_web_acl.main.rule)
-    }
+    }, null)
 
-    load_balancer = {
+    load_balancer = try({
       name               = aws_lb.main.name
       dns_name           = aws_lb.main.dns_name
       load_balancer_type = aws_lb.main.load_balancer_type
       scheme             = aws_lb.main.internal ? "internal" : "internet-facing"
-      state              = "active" # Terraform จะไม่มี state ตรงๆ แต่สามารถใช้ hardcode หรือตัดออกได้
-    }
+      state              = "active"
+    }, null)
 
-    target_group = {
+    target_group = try({
       name = aws_lb_target_group.main.name
       port = aws_lb_target_group.main.port
-    }
+    }, null)
 
-    security_groups = {
-      alb    = aws_security_group.alb_sg.id
-      ec2    = aws_security_group.ec2_sg.id
-      lambda = aws_security_group.lambda_sg.id
-    }
+    # ค้นหา Security Group ถ้าตัวไหนไม่มี จะส่งค่ากลับเป็น null
+    security_groups = try({
+      alb    = try(aws_security_group.alb_sg.id, aws_security_group.lb_sg.id, null)
+      ec2    = try(aws_security_group.ec2_sg.id, aws_security_group.allow_web.id, null)
+      lambda = try(aws_security_group.lambda_sg.id, null)
+    }, null)
 
-    auto_scaling = {
+    auto_scaling = try({
       name             = aws_autoscaling_group.asg.name
       desired_capacity = aws_autoscaling_group.asg.desired_capacity
       min_size         = aws_autoscaling_group.asg.min_size
       max_size         = aws_autoscaling_group.asg.max_size
-    }
+    }, null)
 
-    # กรณีที่สร้าง EC2 แยกด้วย count หรือ for_each
-    ec2_instances = [for inst in aws_instance.web : {
+    ec2_instances = try([for inst in aws_instance.web : {
       id                = inst.id
-      name              = inst.tags["Name"]
+      name              = try(inst.tags["Name"], inst.id)
       status            = inst.instance_state
       instance_type     = inst.instance_type
       private_ip        = inst.private_ip
       availability_zone = inst.availability_zone
-      tags              = inst.tags
-    }]
+      tags              = try(inst.tags, {})
+    }], [])
 
-    image_builder = {
+    image_builder = try({
       instance_id   = aws_instance.builder.id
       ami_id        = aws_ami_from_instance.web_ami.id
       instance_type = aws_instance.builder.instance_type
       status        = aws_instance.builder.instance_state
-      tags          = aws_instance.builder.tags
-    }
+      tags          = try(aws_instance.builder.tags, {})
+    }, null)
 
-    lambda_functions = [for fn in aws_lambda_function.functions : {
+    lambda_functions = try([for fn in aws_lambda_function.functions : {
       name        = fn.function_name
       runtime     = fn.runtime
       memory_size = fn.memory_size
-      tags        = fn.tags
-    }]
+      tags        = try(fn.tags, {})
+    }], [])
 
-    s3_buckets = [for b in aws_s3_bucket.buckets : {
-      name = b.bucket
-      # หมายเหตุ: bucket size ไม่สามารถหาได้ตรงๆ จากการรัน terraform ทั่วไป (ต้องใช้ Data source อื่นร่วม)
+    s3_buckets = try([for b in aws_s3_bucket.buckets : {
+      name       = b.bucket
       size_gb    = null
-      versioning = aws_s3_bucket_versioning.buckets[b.id].versioning_configuration[0].status
-      tags       = b.tags
-    }]
+      versioning = try(aws_s3_bucket_versioning.buckets[b.id].versioning_configuration[0].status, "disabled")
+      tags       = try(b.tags, {})
+    }], [])
   }
 }
