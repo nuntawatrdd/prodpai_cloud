@@ -123,9 +123,6 @@
             echo "${{ secrets.SSH_PRIVATE_KEY }}" > .ssh/fcfalco.pem
             chmod 600 .ssh/fcfalco.pem
 
-        - name: Clean Terraform Cache & Lock
-          run: rm -rf .terraform .terraform.lock.hcl
-
         - name: Terraform Init
           run: terraform init
 
