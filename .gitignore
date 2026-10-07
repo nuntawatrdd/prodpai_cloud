@@ -10,4 +10,3 @@ note.txt
 .terraform/
 .terraform.lock.hcl.tmp
 .ssh/
-.craete_ecr
