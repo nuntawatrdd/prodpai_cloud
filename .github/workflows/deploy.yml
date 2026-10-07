@@ -112,6 +112,13 @@
             aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
             aws-region: us-east-1
 
+        - name: Pre-install Terraform Binary
+          run: |
+            wget -q "https://releases.hashicorp.com/terraform/1.6.0/terraform_1.6.0_linux_amd64.zip" -O /tmp/terraform.zip
+            unzip -o /tmp/terraform.zip -d /usr/local/bin/
+            chmod +x /usr/local/bin/terraform
+            rm -f /tmp/terraform.zip
+            
         - name: Setup Terraform
           uses: hashicorp/setup-terraform@v3
           with:
@@ -131,7 +138,7 @@
             TF_KEY_PROVIDER_SKIP_VERIFY: "true"
             CHECKPOINT_DISABLE: "1"
           run: terraform init -upgrade
-          
+
         - name: Terraform Apply
           run: terraform apply -auto-approve -var="image_tag=${{ github.sha }}"
 
