@@ -123,9 +123,15 @@
             echo "${{ secrets.SSH_PRIVATE_KEY }}" > .ssh/fcfalco.pem
             chmod 600 .ssh/fcfalco.pem
 
+        - name: Clean Terraform Cache
+          run: rm -rf .terraform .terraform.lock.hcl
+        
         - name: Terraform Init
-          run: terraform init
-
+          env:
+            TF_KEY_PROVIDER_SKIP_VERIFY: "true"
+            CHECKPOINT_DISABLE: "1"
+          run: terraform init -upgrade
+          
         - name: Terraform Apply
           run: terraform apply -auto-approve -var="image_tag=${{ github.sha }}"
 
