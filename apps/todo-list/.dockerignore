@@ -1,0 +1,19 @@
+# Only index.html, css/, js/, assets/ and nginx.conf are needed in the image.
+.git
+.gitignore
+.dockerignore
+Dockerfile
+README.md
+tests/
+node_modules/
+coverage/
+.env
+.env.*
+*.log
+*.pem
+*.key
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+package.json

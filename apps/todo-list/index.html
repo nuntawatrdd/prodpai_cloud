@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Plod Phai Todo — a simple task dashboard that keeps your tasks in this browser.">
+  <meta name="color-scheme" content="light dark">
+  <title>Plod Phai Todo</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <!-- Icon sprite: referenced with <use href="#i-..."> -->
+  <svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-logo" viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4h6v3"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 1.8 1.8.7-1.8.7L19 22l-.7-1.8-1.8-.7 1.8-.7z"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  </svg>
+
+  <div class="layout">
+    <aside class="sidebar" aria-label="Task navigation">
+      <div class="brand">
+        <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="#i-logo"/></svg></span>
+        <span class="brand-text">
+          <span class="brand-name">Plod Phai Todo</span>
+          <span class="brand-sub">Daily task board</span>
+        </span>
+      </div>
+
+      <nav class="nav" aria-label="Filter tasks by status">
+        <p class="nav-heading" id="nav-heading">Views</p>
+        <div class="nav-list" role="group" aria-labelledby="nav-heading">
+          <button type="button" class="nav-item is-active" data-filter="all" aria-pressed="true">
+            <svg class="icon" aria-hidden="true"><use href="#i-list"/></svg>
+            <span class="nav-label">All tasks</span>
+            <span class="nav-count" data-count="total">0</span>
+          </button>
+          <button type="button" class="nav-item" data-filter="pending" aria-pressed="false">
+            <svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
+            <span class="nav-label">Pending</span>
+            <span class="nav-count" data-count="pending">0</span>
+          </button>
+          <button type="button" class="nav-item" data-filter="completed" aria-pressed="false">
+            <svg class="icon" aria-hidden="true"><use href="#i-check-circle"/></svg>
+            <span class="nav-label">Completed</span>
+            <span class="nav-count" data-count="completed">0</span>
+          </button>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <p class="nav-heading">Data</p>
+        <button type="button" class="btn btn-ghost btn-block" id="sample-btn">
+          <svg class="icon" aria-hidden="true"><use href="#i-sparkle"/></svg>
+          Load sample tasks
+        </button>
+        <button type="button" class="btn btn-ghost-danger btn-block" id="clear-btn">
+          <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
+          Clear all tasks
+        </button>
+        <p class="storage-note">Tasks are saved only in this browser (localStorage).</p>
+      </div>
+    </aside>
+
+    <main id="main" class="main" tabindex="-1">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow" id="today-label">Today</p>
+          <h1 id="greeting">Welcome back</h1>
+          <p class="lede">Plan your day, track progress, and clear your list one task at a time.</p>
+        </div>
+      </header>
+
+      <div class="alert" id="storage-alert" role="alert" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg>
+        <span id="storage-alert-text"></span>
+      </div>
+
+      <section class="stats" aria-label="Task summary">
+        <article class="stat-card">
+          <span class="stat-icon stat-icon-total"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></span>
+          <div>
+            <p class="stat-label">Total tasks</p>
+            <p class="stat-value" id="stat-total">0</p>
+          </div>
+        </article>
+        <article class="stat-card">
+          <span class="stat-icon stat-icon-done"><svg class="icon" aria-hidden="true"><use href="#i-check-circle"/></svg></span>
+          <div>
+            <p class="stat-label">Completed</p>
+            <p class="stat-value" id="stat-completed">0</p>
+          </div>
+        </article>
+        <article class="stat-card">
+          <span class="stat-icon stat-icon-pending"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg></span>
+          <div>
+            <p class="stat-label">Pending</p>
+            <p class="stat-value" id="stat-pending">0</p>
+          </div>
+        </article>
+        <article class="stat-card stat-progress">
+          <div class="progress-head">
+            <p class="stat-label">Progress</p>
+            <p class="progress-value" id="progress-text">0%</p>
+          </div>
+          <div class="progress-track" role="progressbar" id="progress-bar" aria-label="Tasks completed" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <span class="progress-fill" id="progress-fill"></span>
+          </div>
+        </article>
+      </section>
+
+      <section class="card composer" aria-labelledby="composer-title">
+        <h2 id="composer-title" class="card-title">
+          <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+          Add a new task
+        </h2>
+        <form id="task-form" class="task-form" novalidate>
+          <div class="field field-title">
+            <label for="task-title">Title <span class="req" aria-hidden="true">*</span></label>
+            <input id="task-title" name="title" type="text" maxlength="120" autocomplete="off"
+                   placeholder="e.g. Review pipeline scan results" required aria-describedby="task-title-error">
+            <p class="field-error" id="task-title-error"></p>
+          </div>
+          <div class="field field-desc">
+            <label for="task-description">Description <span class="optional">(optional)</span></label>
+            <textarea id="task-description" name="description" rows="2" maxlength="500"
+                      placeholder="Add a few details" aria-describedby="task-description-error"></textarea>
+            <p class="field-error" id="task-description-error"></p>
+          </div>
+          <div class="field">
+            <label for="task-priority">Priority</label>
+            <select id="task-priority" name="priority">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="task-due">Due date <span class="optional">(optional)</span></label>
+            <input id="task-due" name="dueDate" type="date" aria-describedby="task-due-error">
+            <p class="field-error" id="task-due-error"></p>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="add-btn">
+              <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+              Add task
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card tasks" aria-labelledby="tasks-title">
+        <div class="tasks-head">
+          <h2 id="tasks-title" class="card-title">Your tasks <span class="result-count" id="result-count"></span></h2>
+          <div class="toolbar">
+            <div class="filter-tabs" role="group" aria-label="Status filter">
+              <button type="button" class="chip is-active" data-filter="all" aria-pressed="true">All</button>
+              <button type="button" class="chip" data-filter="pending" aria-pressed="false">Pending</button>
+              <button type="button" class="chip" data-filter="completed" aria-pressed="false">Completed</button>
+            </div>
+            <div class="search">
+              <label for="search-input" class="visually-hidden">Search tasks</label>
+              <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+              <input id="search-input" type="search" placeholder="Search title or description" autocomplete="off">
+            </div>
+            <div class="sort">
+              <label for="sort-select" class="visually-hidden">Sort tasks</label>
+              <select id="sort-select">
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="priority">Priority</option>
+                <option value="due">Due date</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <ul class="task-list" id="task-list" aria-label="Tasks"></ul>
+
+        <div class="empty" id="empty-state" hidden>
+          <div class="empty-art" aria-hidden="true">
+            <svg viewBox="0 0 120 96" class="empty-svg">
+              <rect x="18" y="14" width="84" height="70" rx="10" class="es-card"/>
+              <rect x="30" y="30" width="10" height="10" rx="3" class="es-box"/>
+              <rect x="46" y="32" width="42" height="6" rx="3" class="es-line"/>
+              <rect x="30" y="50" width="10" height="10" rx="3" class="es-box"/>
+              <rect x="46" y="52" width="30" height="6" rx="3" class="es-line"/>
+              <path d="M31.5 35l2.5 2.5 4.5-5" class="es-check"/>
+              <circle cx="96" cy="20" r="9" class="es-dot"/>
+              <path d="M96 16v8M92 20h8" class="es-plus"/>
+            </svg>
+          </div>
+          <h3 id="empty-title">No tasks yet</h3>
+          <p id="empty-text">Add your first task above, or load a few sample tasks to explore.</p>
+          <button type="button" class="btn btn-secondary" id="empty-action">Load sample tasks</button>
+        </div>
+      </section>
+
+      <footer class="app-footer">
+        <p>Plod Phai Cloud demo workload · Data never leaves your browser.</p>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Edit dialog -->
+  <dialog id="edit-dialog" class="dialog" aria-labelledby="edit-title">
+    <form id="edit-form" class="dialog-body" novalidate>
+      <div class="dialog-head">
+        <h2 id="edit-title">Edit task</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close edit dialog">
+          <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+        </button>
+      </div>
+      <div class="field">
+        <label for="edit-title-input">Title <span class="req" aria-hidden="true">*</span></label>
+        <input id="edit-title-input" name="title" type="text" maxlength="120" autocomplete="off" required aria-describedby="edit-title-input-error">
+        <p class="field-error" id="edit-title-input-error"></p>
+      </div>
+      <div class="field">
+        <label for="edit-description">Description <span class="optional">(optional)</span></label>
+        <textarea id="edit-description" name="description" rows="3" maxlength="500" aria-describedby="edit-description-error"></textarea>
+        <p class="field-error" id="edit-description-error"></p>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="edit-priority">Priority</label>
+          <select id="edit-priority" name="priority">
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="edit-due">Due date <span class="optional">(optional)</span></label>
+          <input id="edit-due" name="dueDate" type="date" aria-describedby="edit-due-error">
+          <p class="field-error" id="edit-due-error"></p>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-secondary" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save changes</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Confirmation dialog -->
+  <dialog id="confirm-dialog" class="dialog dialog-sm" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+    <form method="dialog" class="dialog-body">
+      <div class="confirm-icon" aria-hidden="true"><svg class="icon"><use href="#i-trash"/></svg></div>
+      <h2 id="confirm-title">Delete task?</h2>
+      <p id="confirm-text" class="confirm-text"></p>
+      <div class="dialog-actions">
+        <button type="submit" class="btn btn-secondary" value="cancel">Cancel</button>
+        <button type="submit" class="btn btn-danger" value="confirm" id="confirm-ok">Delete</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast-region" id="toast-region" role="status" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="js/core.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

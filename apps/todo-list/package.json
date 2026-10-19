@@ -1,0 +1,15 @@
+{
+  "name": "plodphai-todo-list",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Plod Phai Cloud demo workload: static Todo List (tests only; no runtime dependencies)",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "test:unit": "node --test tests/core.test.js tests/static.test.js",
+    "test:e2e": "node --test tests/e2e.test.js"
+  }
+}
