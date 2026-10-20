@@ -1,5 +1,6 @@
 from flask import Flask, Response, request, jsonify, render_template
 import hashlib
+import hmac
 import json
 import os
 import tempfile
@@ -38,6 +39,9 @@ TF_LOCK_NAME = ".terraform.tfstate.lock.info"
 # bucket ต้องเป็น private และ credential ต้องมีสิทธิ์แค่ s3:GetObject/s3:PutObject บน key นี้
 S3_BUCKET = os.environ.get("INFRA_S3_BUCKET", "").strip()
 S3_KEY = os.environ.get("INFRA_S3_KEY", "dashboard/current_infra.json").strip()
+
+# token สำหรับ /api/update (ส่งมาใน header X-Update-Token) ถ้าไม่ตั้งค่าจะรับข้อมูลโดยไม่ตรวจเหมือนเดิม
+UPDATE_TOKEN = os.environ.get("INFRA_UPDATE_TOKEN", "").strip()
 
 READ_RETRIES = 3
 READ_RETRY_SECONDS = 0.15
@@ -605,6 +609,9 @@ def describe(snapshot, resources, payload, issues):
 
 @app.route('/api/update', methods=['POST'])
 def update_infra():
+    if UPDATE_TOKEN and not hmac.compare_digest(request.headers.get("X-Update-Token", ""), UPDATE_TOKEN):
+        return jsonify({"status": "error", "message": "Invalid or missing X-Update-Token."}), 401
+
     req_data = request.get_json(silent=True)
     if not isinstance(req_data, dict):
         return jsonify({"status": "error", "message": "Request body must be a JSON object."}), 400
