@@ -1,0 +1,84 @@
+name: Deploy
+
+# Manual only, run by us as the owner of the AWS account: builds the
+# infrastructure in this repository with an image the application's CI already
+# tested, scanned and pushed to our ECR, then updates and feeds the dashboard EC2.
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "ECR image tag to deploy (a commit SHA from the app's CI, or latest)"
+        type: string
+        default: latest
+
+permissions:
+  contents: read
+
+# Same group as destroy.yml, so apply and destroy never run at the same time.
+concurrency:
+  group: prodpai-terraform
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  # The repository ec2.tf pulls the application image from.
+  ECR_REPOSITORY: plodphai-todo-list
+  DASHBOARD_NAME: prodpai-dashboard
+  IMAGE_TAG: ${{ inputs.image_tag }}
+
+jobs:
+  deploy:
+    name: Deploy infrastructure and dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # the Terraform configuration and the scripts in .github/scripts
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check image exists in ECR
+        run: |
+          if ! aws ecr describe-images --repository-name "$ECR_REPOSITORY" \
+               --image-ids imageTag="$IMAGE_TAG" >/dev/null 2>&1; then
+            echo "::error::$ECR_REPOSITORY:$IMAGE_TAG is not in ECR (wait for the app's CI to push it)"
+            exit 1
+          fi
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          # raw stdout, so `terraform output -json` can be piped to curl
+          terraform_wrapper: false
+
+      - name: Terraform apply
+        run: |
+          terraform init -input=false
+          terraform apply -auto-approve -input=false -var="image_tag=$IMAGE_TAG"
+
+      - name: Start dashboard instance
+        id: dash
+        run: bash .github/scripts/dashboard/start-instance.sh
+
+      # The dashboard EC2 pulls its code from this repository, at the ref this run uses.
+      - name: Update dashboard code
+        env:
+          IID: ${{ steps.dash.outputs.id }}
+          INFRA_REPO: ${{ github.repository }}
+          INFRA_REF: ${{ github.ref_name }}
+        run: bash .github/scripts/dashboard/update-code.sh
+
+      - name: Send Terraform output to dashboard
+        env:
+          IP: ${{ steps.dash.outputs.ip }}
+          TOKEN: ${{ secrets.DASHBOARD_TOKEN }}
+        run: bash .github/scripts/dashboard/push-output.sh

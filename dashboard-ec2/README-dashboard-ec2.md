@@ -86,6 +86,11 @@ systemctl enable --now prodpai-dashboard
 
 ## 4. ส่งข้อมูลหลัง `terraform apply`
 
+> ถ้า deploy ผ่าน workflow `Deploy` ของ `prodpai_cloud` ไม่ต้องทำหัวข้อนี้เลย —
+> workflow เปิดเครื่อง Dashboard, อัปเดตโค้ด แล้ว POST output ให้เองครบ
+> (ต้องใส่ secret `DASHBOARD_TOKEN` ใน repo ให้ตรงกับ token ของเครื่องนี้)
+> หัวข้อนี้ไว้ใช้ตอน apply จากเครื่องตัวเอง
+
 ### แบบกดครั้งเดียว (Windows + WSL Ubuntu)
 
 1. บันทึก token ไว้ใน WSL: `mkdir -p ~/.prodpai-dashboard && echo '<token>' > ~/.prodpai-dashboard/token`
@@ -112,8 +117,9 @@ terraform output -json infrastructure_summary | curl -sf -X POST \
 
 - **Public IP เปลี่ยนทุกครั้งที่ lab ปิดแล้วเปิดใหม่** (ไม่ได้ใช้ Elastic IP) ดู IP ใหม่ที่ EC2 Console ส่วนข้อมูลเดิมยังอยู่บนดิสก์
 - **ระหว่างปิด lab** AWS Academy หยุดเครื่อง เปิด Dashboard ไม่ได้
-- **อัปเดตโค้ด Dashboard**: User data รันเฉพาะบูตครั้งแรก ถ้ามีโค้ดใหม่ให้สร้างเครื่องใหม่ หรือ SSH เข้าไปรัน `cd /opt/prodpai && git pull && sudo systemctl restart prodpai-dashboard`
-- `apply-and-push` และ `push-dashboard.sh` หาเครื่องจาก tag `Name=prodpai-dashboard` จึงต้องตั้งชื่อเครื่องตามนี้
+- **อัปเดตโค้ด Dashboard**: User data รันเฉพาะบูตครั้งแรก workflow `Deploy` อัปเดตโค้ดให้เองทุกรอบผ่าน SSM (`.github/scripts/dashboard/remote-update.sh` ดึง `prodpai_cloud` ลง `/opt/prodpai` แล้ว restart service) ถ้าทำเองก็ SSH เข้าไปรัน `cd /opt/prodpai && git pull && sudo systemctl restart prodpai-dashboard`
+- `apply-and-push`, `push-dashboard.sh` และสคริปต์ใน `.github/scripts/dashboard/` หาเครื่องจาก tag `Name=prodpai-dashboard` จึงต้องตั้งชื่อเครื่องตามนี้
+- workflow `Deploy` ต้องเข้าเครื่องนี้ทาง **SSM** ได้ ถ้าเครื่องไม่มี instance profile สคริปต์จะ attach `LabInstanceProfile` ให้เอง
 - **ห้ามสร้างเครื่องนี้ใน Terraform ของ prodpai_cloud** เพราะ `terraform destroy` จะลบไปด้วย
 - token ที่ใส่ใน User data มองเห็นได้โดยคนที่เข้า EC2 Console ของบัญชีนั้น ซึ่งยอมรับได้สำหรับ lab
 - ค่าใช้จ่ายประมาณ 0.015 USD/ชั่วโมงขณะเปิด (t3.micro + Public IPv4)
