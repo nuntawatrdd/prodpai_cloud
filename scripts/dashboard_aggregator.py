@@ -1,184 +1,133 @@
-import json
+"""
+เว็บ dashboard ที่รันบน EC2 ใน private subnet
+
+ตัวแอปไม่ได้คุย AWS API เองเลย (นอกจากปุ่ม force-refresh) หน้าที่กวาดข้อมูลเป็นของ
+Lambda prod-pai-Infra-Aggregator ที่เขียน JSON ลง S3 ทุก 2 นาที แอปนี้แค่
+อ่านไฟล์นั้นผ่าน S3 Gateway Endpoint แล้วส่งต่อให้หน้าเว็บ
+
+ทุก route อยู่ใต้ /dashboard เพราะ ALB ส่ง path มาตามที่ผู้ใช้พิมพ์ (rewrite ไม่ได้)
+"""
+
+from flask import Flask, jsonify, render_template, Response
 import boto3
+import json
 import os
-from datetime import datetime, timedelta
+import time
 
-# ==========================================
-# ตั้งค่า AWS Clients
-# ==========================================
-region = os.environ.get('AWS_REGION', 'us-east-1')
-ec2 = boto3.client('ec2', region_name=region)
-cw = boto3.client('cloudwatch', region_name=region)
-s3 = boto3.client('s3', region_name=region)
-elbv2 = boto3.client('elbv2', region_name=region)
+app = Flask(__name__)
 
-S3_BUCKET = os.environ.get('S3_BUCKET')
-S3_KEY = os.environ.get('S3_KEY', 'dashboard/current_infra.json')
+S3_BUCKET = os.environ.get("INFRA_S3_BUCKET", "prod-pai-logs")
+S3_KEY = os.environ.get("INFRA_S3_KEY", "dashboard/current_infra.json")
+LAMBDA_NAME = os.environ.get("INFRA_LAMBDA_NAME", "prod-pai-Infra-Aggregator")
+AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
 
-def get_cpu_utilization(instance_id):
+# ใช้เก็บ ETag เพื่อเช็คว่าไฟล์ใน S3 มีการอัปเดตหรือไม่
+cache = {"etag": None, "data": None}
+
+
+def fetch_s3_data():
+    s3 = boto3.client('s3', region_name=AWS_REGION)
+    try:
+        # เช็ค ETag ก่อนว่าไฟล์เปลี่ยนไหม จะได้ไม่ต้องโหลดไฟล์เต็มๆ ทุกรอบ
+        head = s3.head_object(Bucket=S3_BUCKET, Key=S3_KEY)
+        etag = head['ETag'].strip('"')
+
+        if cache['etag'] != etag or cache['data'] is None:
+            obj = s3.get_object(Bucket=S3_BUCKET, Key=S3_KEY)
+            raw_data = obj['Body'].read().decode('utf-8')
+            cache['data'] = json.loads(raw_data)
+            cache['etag'] = etag
+
+        return cache['data'], cache['etag']
+    except Exception as e:
+        app.logger.error(f"S3 Fetch Error: {e}")
+        return None, "error"
+
+
+@app.route('/dashboard/health', methods=['GET'])
+def health():
     """
-    ฟังก์ชันสำหรับดึงค่า CPU เฉลี่ยย้อนหลัง 5 นาทีจาก CloudWatch
+    ALB ใช้ path นี้เช็คว่าเครื่องยังรับงานได้ไหม
+
+    ตั้งใจให้ตอบ 200 เสมอโดยไม่แตะ S3 เพราะถ้าผูกสุขภาพของเว็บไว้กับการมีข้อมูลใน S3
+    ช่วงที่ aggregator ยังไม่ได้ยิงรอบแรก ALB จะถอดเครื่องออกทั้งที่ตัวเว็บปกติดี
     """
-    end_time = datetime.utcnow()
-    start_time = end_time - timedelta(minutes=5)
+    return jsonify({"status": "ok"}), 200
+
+
+@app.route('/dashboard/api/data', methods=['GET'])
+def get_data():
+    data, etag = fetch_s3_data()
+    if not data:
+        return jsonify({
+            "state": "waiting",
+            "source": "waiting",
+            "message": "ยังไม่มีข้อมูลใน S3",
+            "detail": f"รอ Lambda {LAMBDA_NAME} เขียน s3://{S3_BUCKET}/{S3_KEY} รอบแรก",
+            "resources": [],
+            "topology": {"regions": []},
+            "health": {"healthy": 0, "unhealthy": 0, "total_targets": 0, "compromised": []},
+        })
+
+    resources = data.get("resources", [])
+    return jsonify({
+        "state": "live",
+        "source": data.get("source", "aws_api"),
+        "version": etag,
+        "applied_at": data.get("update_time"),
+        "region": data.get("region"),
+        "project": data.get("project"),
+        "environment": data.get("environment"),
+        # ชั้นข้อมูลที่หน้า topology ใช้วาด region -> vpc -> az -> public/private
+        "topology": data.get("topology", {"regions": []}),
+        # healthy นับจากสมาชิก target group เท่านั้น (คำนวณมาจาก Lambda แล้ว)
+        "health": data.get("health", {}),
+        "incidents": data.get("incidents", []),
+        "cost": data.get("cost", {}),
+        "summary": {
+            "total": len(resources),
+            "health": {
+                "healthy": sum(1 for r in resources if r.get("health") == "healthy"),
+                "warning": sum(1 for r in resources if r.get("health") == "warning"),
+                "error": sum(1 for r in resources if r.get("health") == "error"),
+            },
+        },
+        "resources": resources,
+    })
+
+
+@app.route('/dashboard/api/force-refresh', methods=['POST'])
+def force_refresh():
     try:
-        response = cw.get_metric_statistics(
-            Namespace='AWS/EC2',
-            MetricName='CPUUtilization',
-            Dimensions=[{'Name': 'InstanceId', 'Value': instance_id}],
-            StartTime=start_time,
-            EndTime=end_time,
-            Period=300,
-            Statistics=['Average']
-        )
-        datapoints = response.get('Datapoints', [])
-        if datapoints:
-            return round(datapoints[0]['Average'], 2)
+        lam = boto3.client('lambda', region_name=AWS_REGION)
+        lam.invoke(FunctionName=LAMBDA_NAME, InvocationType='RequestResponse')
+        # ล้าง Cache เพื่อบังคับดึงใหม่
+        cache['etag'] = None
+        return jsonify({"status": "success", "message": "AWS Infrastructure Synced!"})
     except Exception as e:
-        print(f"Failed to fetch CPU for {instance_id}: {e}")
-    return 0.0
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-def lambda_handler(event, context):
-    resources = []
-    
-    # ==========================================
-    # 1. ดึงข้อมูล EC2 Instances และตรวจสอบ Compromise
-    # ==========================================
-    try:
-        instances = ec2.describe_instances()
-        for reservation in instances.get('Reservations', []):
-            for inst in reservation.get('Instances', []):
-                # แปลง Tags เป็น Dictionary
-                tags = {t['Key']: t['Value'] for t in inst.get('Tags', [])}
-                name = tags.get('Name', inst['InstanceId'])
-                
-                state_name = inst['State']['Name']
-                
-                # 🚨 ตรวจสอบสถานะ Compromised จาก Tag
-                is_compromised = tags.get('SecurityStatus') == 'Compromised'
-                
-                if is_compromised:
-                    health = "error"
-                    status = "COMPROMISED (ISOLATED)"
-                else:
-                    health = "healthy" if state_name == 'running' else "warning"
-                    if state_name in ['stopped', 'terminated']:
-                        health = "inactive"
-                    status = state_name
 
-                # ดึง CPU Metric เฉพาะเครื่องที่ทำงานอยู่
-                cpu_metric = ""
-                if state_name == 'running':
-                    cpu = get_cpu_utilization(inst['InstanceId'])
-                    cpu_metric = f" | CPU: {cpu}%"
+@app.route('/dashboard/api/events', methods=['GET'])
+def events():
+    def stream():
+        last_etag = cache['etag']
+        yield "retry: 3000\n: connected\n\n"
+        while True:
+            time.sleep(2)
+            _, current_etag = fetch_s3_data()
+            if current_etag != "error" and current_etag != last_etag:
+                last_etag = current_etag
+                yield f"event: change\ndata: {current_etag}\n\n"
 
-                resources.append({
-                    "id": inst['InstanceId'],
-                    "name": name,
-                    "type": "aws_instance",
-                    "category": "Compute",
-                    "status": status,
-                    "health": health,
-                    "private_ip": inst.get('PrivateIpAddress', ''),
-                    "public_ip": inst.get('PublicIpAddress', ''),
-                    "az": inst.get('Placement', {}).get('AvailabilityZone', ''),
-                    "spec": f"{inst['InstanceType']}{cpu_metric}",
-                    "tags": tags,
-                    "role": tags.get('Role', 'instance')
-                })
-    except Exception as e:
-        print(f"Error fetching EC2: {e}")
+    return Response(stream(), mimetype="text/event-stream")
 
-    # ==========================================
-    # 2. ดึงข้อมูล VPCs
-    # ==========================================
-    try:
-        vpcs = ec2.describe_vpcs()
-        for vpc in vpcs.get('Vpcs', []):
-            tags = {t['Key']: t['Value'] for t in vpc.get('Tags', [])}
-            resources.append({
-                "id": vpc['VpcId'],
-                "name": tags.get('Name', vpc['VpcId']),
-                "type": "aws_vpc",
-                "category": "Network",
-                "status": vpc.get('State', 'available'),
-                "health": "healthy" if vpc.get('State') == 'available' else "warning",
-                "spec": vpc.get('CidrBlock', ''),
-                "tags": tags
-            })
-    except Exception as e:
-        print(f"Error fetching VPCs: {e}")
 
-    # ==========================================
-    # 3. ดึงข้อมูล Subnets
-    # ==========================================
-    try:
-        subnets = ec2.describe_subnets()
-        for subnet in subnets.get('Subnets', []):
-            tags = {t['Key']: t['Value'] for t in subnet.get('Tags', [])}
-            resources.append({
-                "id": subnet['SubnetId'],
-                "name": tags.get('Name', subnet['SubnetId']),
-                "type": "aws_subnet",
-                "category": "Network",
-                "status": subnet['State'],
-                "health": "healthy" if subnet['State'] == 'available' else "warning",
-                "az": subnet['AvailabilityZone'],
-                "spec": subnet['CidrBlock'],
-                "tags": tags
-            })
-    except Exception as e:
-        print(f"Error fetching Subnets: {e}")
+@app.route('/dashboard')
+@app.route('/dashboard/')
+def dashboard():
+    return render_template('index.html')
 
-    # ==========================================
-    # 4. ดึงข้อมูล Load Balancers (ALB)
-    # ==========================================
-    try:
-        lbs = elbv2.describe_load_balancers()
-        for lb in lbs.get('LoadBalancers', []):
-            resources.append({
-                "id": lb['LoadBalancerName'], 
-                "name": lb['LoadBalancerName'],
-                "type": "aws_lb",
-                "category": "Network",
-                "status": lb['State']['Code'],
-                "health": "healthy" if lb['State']['Code'] == 'active' else "warning",
-                "endpoint": lb['DNSName'],
-                "spec": lb['Type'],
-                "tags": {}
-            })
-    except Exception as e:
-        print(f"Error fetching ELBs: {e}")
 
-    # ==========================================
-    # สร้าง Payload ให้ตรงตามรูปแบบที่เว็บคาดหวัง
-    # ==========================================
-    payload = {
-        "project": "DevSecOps Cloud",
-        "environment": "Production",
-        "region": region,
-        "update_time": datetime.utcnow().isoformat() + "Z",
-        "source": "live",
-        "resources": resources
-    }
-
-    # ==========================================
-    # อัปโหลด JSON ลง S3
-    # ==========================================
-    try:
-        s3.put_object(
-            Bucket=S3_BUCKET,
-            Key=S3_KEY,
-            Body=json.dumps(payload, ensure_ascii=False, indent=2),
-            ContentType='application/json'
-        )
-        print(f"Successfully uploaded to s3://{S3_BUCKET}/{S3_KEY}")
-    except Exception as e:
-        print(f"Error uploading to S3: {e}")
-        raise e
-
-    # คืนค่ากลับไปให้คนที่เรียก (เช่น เว็บเรียกมา หรือ EventBridge เรียกมา)
-    return {
-        'statusCode': 200,
-        'body': json.dumps('Dashboard Data Synced Successfully')
-    }
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, threaded=True)  # nosemgrep
