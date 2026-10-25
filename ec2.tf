@@ -180,5 +180,10 @@ resource "aws_instance" "dashboard" {
     AWS_REGION  = var.aws_region
   })
 
+  depends_on = [
+    aws_nat_gateway.nat,                # เปลี่ยนชื่อ resource ให้ตรงกับของคุณ
+    aws_route_table_association.private # เปลี่ยนชื่อ resource ให้ตรงกับของคุณ
+  ]
+
   tags = { Name = "DevSecOps-Dashboard-Ubuntu" }
 }
