@@ -171,6 +171,7 @@ resource "aws_instance" "dashboard" {
   iam_instance_profile   = "LabInstanceProfile"
   vpc_security_group_ids = [aws_security_group.dashboard_ec2_sg.id]
 
+
   # โหลด Script ของ Ubuntu
   user_data = templatefile("${path.module}/scripts/setup_dashboard.sh", {
     IMAGE_TAG   = var.image_tag

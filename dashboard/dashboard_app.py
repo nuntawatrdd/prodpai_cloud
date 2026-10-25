@@ -118,7 +118,7 @@ def events():
             _, current_etag = fetch_s3_data()
             if current_etag != "error" and current_etag != last_etag:
                 last_etag = current_etag
-                yield f"event: change\ndata: {current_etag}\n\n"
+                yield f"event: change\ndata: {current_etag}\n\n"    
 
     return Response(stream(), mimetype="text/event-stream")
 

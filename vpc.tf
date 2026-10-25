@@ -4,7 +4,9 @@
 # has internal-gw for public access and has nat-gw for direch ssh
 # -----
 resource "aws_vpc" "main" {
-  cidr_block = local.vpc_cdir
+  cidr_block           = local.vpc_cdir
+  enable_dns_support   = true
+  enable_dns_hostnames = true
 
   tags = merge(
     local.common_tag,
