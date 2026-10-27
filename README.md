@@ -45,9 +45,9 @@ Internet ──▶ WAF ──▶ ALB :80 ─┬─ "/"           ──▶ TG :8
                               └─ "/dashboard*" ──▶ TG :5000 ──▶ dashboard EC2 (private b)
 
 เครื่องใน ASG บูตขึ้นมา ──▶ อ่าน SSM /prod-pai/app/image_tag ──▶ docker pull <tag> นั้นจาก ECR
-  (tag ไม่ได้ฝังใน launch template การ deploy จึงเหลือแค่เปลี่ยนค่าใน SSM แล้วสั่ง refresh)
+  (tag ไม่ได้ฝังใน launch template การ deploy จึงเหลือแค่เปลี่ยนค่าใน SSM แล้วรัน rollout_asg.sh)
 
-Lambda prod-pai-Infra-Aggregator ──▶ กวาด AWS API ──▶ s3://prod-pai-logs/dashboard/current_infra.json
+Lambda prod-pai-Infra-Aggregator ──▶ กวาด AWS API ──▶ s3://<DATA_BUCKET>/dashboard/current_infra.json
       ▲                                                                  ▲
       └─ ปุ่ม Sync AWS บนหน้าเว็บเท่านั้น (ไม่มี schedule / EventBridge ข้อมูลขยับเมื่อกด)
                               dashboard EC2 อ่านผ่าน S3 Gateway Endpoint ─┘  (ไม่ออกอินเทอร์เน็ต)
@@ -88,8 +88,11 @@ Falco บนทุกเครื่อง ── Emergency/Alert/Critical ─�
 | `prodpai_cloud` (repo นี้) | Terraform, workflow `infra_setup` / `launch_image` / `destroy`, Lambda, โค้ด dashboard | เรา (เจ้าของบัญชี AWS) |
 | `plodphai-todo-list` | โค้ดแอป + `ci.yml` ที่ push image ขึ้น ECR แล้ว rollout เข้า ASG ให้เอง | ฝั่งแอป |
 
-- ALB เสิร์ฟได้ **ทีละ 1 app** ขึ้นกับชื่อ ECR ใน `ec2.tf:14` ต้องตรงกับ `ECR_REPOSITORY` ในทั้งสอง workflow
-- เครื่องดึง image **ตอนบูตเท่านั้น** (อ่าน tag จาก SSM) การเปลี่ยน image จึงต้องผ่าน instance refresh เสมอ
+- ALB เสิร์ฟได้ **ทีละ 1 app** คือ ECR ที่ชื่อ `APP_ECR_REPOSITORY` ใน `.github/config.env` ของ repo นี้
+  ต้องตรงกับ `ECR_REPOSITORY` ใน `.github/config.env` ของ repo แอป
+- ชื่อ bucket / ECR ทุกตัวที่ต่างกันไปตาม account อยู่ใน `.github/config.env` ที่เดียว
+  (ในเอกสารนี้เขียนเป็น `<DATA_BUCKET>` / `<TF_STATE_BUCKET>` ตามชื่อ key ในไฟล์นั้น)
+- เครื่องดึง image **ตอนบูตเท่านั้น** (อ่าน tag จาก SSM) การเปลี่ยน image จึงต้องสลับเครื่องด้วย `scripts/rollout_asg.sh` เสมอ
   CI ฝั่งแอปสั่งให้เองหลัง push หรือกด **Launch Image** เอง — ไม่ใช่กด Infra Setup ซ้ำ
 
 ---
@@ -168,10 +171,19 @@ workflow จะ: เช็ค image → กันการ apply ทับ → �
 
 ### จากเครื่องตัวเอง (WSL)
 
+ตัวแปร `data_bucket` / `app_ecr_repository` / `dashboard_ecr_repository` ไม่มีค่า default
+ต้องส่งจาก `.github/config.env` แบบเดียวกับที่ workflow ทำ:
+
 ```bash
-terraform init -reconfigure -backend-config="bucket=prodpai-tfstate-<ชื่อตัวเอง>"
+set -a; . .github/config.env; set +a
+export TF_VAR_data_bucket="$DATA_BUCKET"        TF_VAR_app_ecr_repository="$APP_ECR_REPOSITORY"        TF_VAR_dashboard_ecr_repository="$DASHBOARD_ECR_REPOSITORY"
+
+terraform init -reconfigure -backend-config="bucket=$TF_STATE_BUCKET"
 terraform apply -var="image_tag=latest"
 ```
+
+> วิธีนี้ไม่มีขั้น build image dashboard ให้ — ต้องมี `prodpai_dashboard:latest` ใน ECR อยู่ก่อน
+> (รัน Infra Setup ผ่าน Actions สักรอบ หรือ build/push เองจาก `dashboard/`)
 
 ## 5. เช็คว่าใช้ได้
 
@@ -185,7 +197,7 @@ curl -s "$(terraform output -raw dashboard_url)/health" # ต้องได้ 
 | EC2 → Target Groups → `prod-pai-env-lb-target` | 2 เครื่อง `healthy` (ช่วงแรก `initial` 1–2 นาทีปกติ) |
 | EC2 → Target Groups → `dashboard-tg-5000` | 1 เครื่อง `healthy` (health check = `/dashboard/health`) |
 | EC2 → Instances | `prod-pai-env-instance` 2 เครื่อง + `prod-pai-env-dashboard` 1 เครื่อง |
-| S3 → `prod-pai-logs/dashboard/current_infra.json` | กด Sync AWS บนหน้า dashboard ก่อน แล้วจะมีไฟล์ และ `update_time` ขยับทุกครั้งที่กด |
+| S3 → `<DATA_BUCKET>/dashboard/current_infra.json` | กด Sync AWS บนหน้า dashboard ก่อน แล้วจะมีไฟล์ และ `update_time` ขยับทุกครั้งที่กด |
 | เบราว์เซอร์ | `http://<alb>/` เห็นแอป · `http://<alb>/dashboard` เห็นแผนผัง |
 
 > builder (`prod-pai-env-image-builder`) ถูก terminate อัตโนมัติท้าย apply เห็นเป็น `terminated` ปกติ
@@ -216,7 +228,13 @@ bash scripts/rollout_asg.sh <asg>
 ## 7. ลบทั้งหมด
 
 Actions → **Destroy** → พิมพ์ `destroy` ยืนยัน
-(bucket `prod-pai-logs`, bucket ของ tfstate และ image ใน ECR ไม่ถูกลบ)
+
+workflow จะ terminate เครื่องที่ถูกกัก (tag `SecurityStatus=Compromised`) ก่อน เพราะ Terraform ไม่รู้จักเครื่องพวกนี้
+และมันยังจับ subnet / SG ไว้ทำให้ destroy ติด `DependencyViolation` จากนั้นจึง `terraform destroy`
+แล้วเช็คว่าไม่มีอะไรเหลือใน state
+
+ที่ไม่ถูกลบ: bucket `<DATA_BUCKET>` (snapshot + incident), bucket `<TF_STATE_BUCKET>`, image ใน ECR,
+และ EBS snapshot / volume ของเครื่องที่ถูกกัก (ตั้งใจเก็บไว้เป็นหลักฐาน)
 
 ---
 
@@ -232,7 +250,9 @@ Actions → **Destroy** → พิมพ์ `destroy` ยืนยัน
 - **ค่าใช้จ่าย** ใช้ไปแล้วเดือนนี้ / อัตราต่อเดือนตอนนี้ / คาดการณ์สิ้นเดือน / อีก 30 วัน
   ถ้าบัญชีเปิด Cost Explorer ให้จะใช้ของจริง ถ้าไม่ให้จะประเมินจาก resource ที่มีอยู่คูณราคา on-demand
   (หน้าเว็บบอกที่มาของตัวเลขไว้ทุกครั้ง)
-- **เหตุการณ์ด้านความปลอดภัย** timeline จาก `s3://prod-pai-logs/dashboard/incidents/`
+- **เหตุการณ์ด้านความปลอดภัย** timeline จาก `s3://<DATA_BUCKET>/dashboard/incidents/`
+- **ปุ่ม Sync AWS** (`POST /dashboard/api/force-refresh`) เป็นทางเดียวที่สั่ง aggregator ให้กวาดข้อมูลใหม่
+  กดซ้ำได้ทุก 30 วินาที (`SYNC_COOLDOWN_SECONDS`) ถ้ากดเร็วกว่านั้นจะได้ 429 และถ้ามีรอบที่ยังรันอยู่จะได้ 409
 
 ---
 
@@ -245,10 +265,11 @@ Actions → **Destroy** → พิมพ์ `destroy` ยืนยัน
 | `Backend initialization required` | bucket ใน config ไม่ตรงกับ cache | `terraform init -reconfigure -backend-config="bucket=..."` |
 | `couldn't find resource` ที่ `data.aws_ecr_repository` | ยังไม่สร้าง ECR repo | หัวข้อ 2 |
 | `Infra Setup` ตกที่ `มี stack อยู่แล้ว` | ของยังอยู่ กำลังจะ apply ทับ (ข้อห้าม #3) | ใช้ `Launch Image` แทน |
-| `Infra Setup` ตกที่ `Check image exists in ECR` | ยังไม่มี tag นั้นใน ECR | รอ CI ฝั่งแอปให้ผ่าน แล้วเอา tag จาก step summary |
+| `Infra Setup` ตกที่ `Check application image exists in ECR` | ยังไม่มี tag นั้นใน ECR | รอ CI ฝั่งแอปให้ผ่าน แล้วเอา tag จาก step summary |
 | `dashboard-tg-5000` ไม่เขียวสักที | คอนเทนเนอร์ dashboard ยังไม่ขึ้น หรือ image ใน ECR ยังไม่มี | ดู system log ของ `prod-pai-env-dashboard`, เช็คว่ามี `prodpai_dashboard:latest` ใน ECR |
-| dashboard ขึ้นแต่ไม่มีข้อมูล | aggregator ยังไม่ยิงรอบแรก หรือเขียน S3 ไม่ได้ | CloudWatch → log ของ `prod-pai-Infra-Aggregator`, เช็คว่ามี bucket `prod-pai-logs` |
+| dashboard ขึ้นแต่ไม่มีข้อมูล | ยังไม่เคยกด Sync AWS (ไม่มี schedule) หรือ aggregator เขียน S3 ไม่ได้ | กด Sync AWS แล้วดู CloudWatch → log ของ `prod-pai-Infra-Aggregator`, เช็คว่ามี bucket `<DATA_BUCKET>` |
 | เครื่อง unhealthy วนถูกแทนที่ทุก ~4 นาที | Falco กัก หรือ image ไม่มี `/health` ที่ 8080 | ดู `/falco/alerts` ว่าคำสั่งอะไรโดนจับ |
 | ALB ตอบ 403 | WAF rate limit 100 GET/นาที/IP | รอ 1–2 นาที (ตั้งใจไว้) |
-| เห็น EC2 3 เครื่อง | เครื่องเก่ากำลัง draining (สูงสุด 5 นาที) | ปกติ |
-| เครื่องที่โดนยึดยังอยู่ไม่หายไป | ตั้งใจ — detach ออกจาก ASG แล้วเพื่อเก็บเป็นหลักฐาน | ลบเองเมื่อสืบเสร็จ (snapshot ยังอยู่) |
+| เห็น EC2 3 เครื่อง | กำลัง rollout (`rollout_asg.sh` เพิ่ม desired +1 ก่อน) หรือเครื่องเก่ากำลัง draining (สูงสุด 5 นาที) | ปกติ |
+| rollout หยุดกลางทาง เครื่องเก่ายังอยู่ | เครื่องใหม่ไม่ healthy ภายในเวลา (45 × 20 วิ ต่อเครื่อง) — ตั้งใจหยุดก่อนปิดเครื่องเก่า | ดู system log ของเครื่องใหม่ว่าดึง tag จาก SSM / `docker pull` ได้ไหม แล้วกด Launch Image ด้วย tag เดิมเพื่อย้อน |
+| เครื่องที่โดนยึดยังอยู่ไม่หายไป | ตั้งใจ — detach ออกจาก ASG แล้วเพื่อเก็บเป็นหลักฐาน | สืบเสร็จแล้วรัน `scripts/release_quarantine_nacl.sh <instance-id> --apply` ปลด NACL deny ก่อน แล้วค่อย terminate (ไม่งั้นเครื่องใหม่ที่ได้ IP เดิมจะโดนบล็อกด้วย) snapshot ยังอยู่ |
