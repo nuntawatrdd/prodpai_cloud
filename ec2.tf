@@ -130,20 +130,6 @@ resource "aws_autoscaling_group" "asg" {
     id      = aws_launch_template.prodpai_web_template.id
     version = "$Latest"
   }
-
-  instance_refresh {
-    strategy = "Rolling"
-    preferences {
-      min_healthy_percentage = 50
-      instance_warmup        = 180
-    }
-    triggers = ["tag"]
-  }
-
-  lifecycle {
-    ignore_changes = [desired_capacity]
-  }
-
 }
 
 # -----
