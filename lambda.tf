@@ -101,7 +101,11 @@ resource "aws_lambda_function" "infra_aggregator" {
   runtime          = "python3.10"
   handler          = "dashboard_aggregator.lambda_handler"
   source_code_hash = data.archive_file.aggregator_zip.output_base64sha256
-  timeout          = 30
+
+  # กวาดทั้ง region (EC2/VPC/subnet/SG/IGW/NAT/ALB+target health/ASG/WAF/EBS) + CloudWatch
+  # + Cost Explorer ใช้เวลามากกว่าเดิม 30 วินาทีจึงไม่พอ
+  timeout     = 120
+  memory_size = 512
 
   environment {
     variables = {
