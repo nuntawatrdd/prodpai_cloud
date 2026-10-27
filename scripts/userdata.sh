@@ -10,7 +10,9 @@ TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-m
 INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
 hostnamectl set-hostname "$INSTANCE_ID"
 
-systemctl restart falco || true
+# unit ของ falco ชื่อตาม driver ไม่ใช่ falco.service — falco_setup.sh enable falco-modern-bpf ไว้
+# ทั้งสองตัวถูก enable ใน AMI อยู่แล้ว บรรทัดนี้แค่กันกรณีเพิ่งบูตมาแล้ว service ยังไม่ขึ้น
+systemctl restart falco-modern-bpf || true
 systemctl restart falcosidekick || true
 
 ECR_REGISTRY=$(echo "${ECR_URL}" | cut -d'/' -f1)
