@@ -58,5 +58,5 @@ jobs:
               --no-should-decrement-desired-capacity
             
             # Wait 30 seconds between terminations to allow the new instance to boot
-            sleep 30 
+            sleep 300 
           done
