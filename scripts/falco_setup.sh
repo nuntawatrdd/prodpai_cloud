@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -ex  # -x ช่วยให้ Terraform พ่น log ออกมาทุกบรรทัด จะได้รู้ว่าทำถึงไหนแล้ว
 
 echo "Waiting for cloud-init / OS boot to complete..."
 cloud-init status --wait
@@ -11,8 +11,9 @@ curl -s https://falco.org/repo/falcosecurity-packages.asc | sudo gpg --dearmor -
 echo "deb [signed-by=/usr/share/keyrings/falco-archive-keyring.gpg] https://download.falco.org/packages/deb stable main" | sudo tee /etc/apt/sources.list.d/falcosecurity.list
 
 sudo apt-get update
-sudo apt-get install -y linux-headers-$(uname -r) falco
 
+# แก้ปัญหาหน้าจอ Pop-up บังคับให้ลงแบบ Non-interactive
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y linux-headers-$(uname -r) falco
 
 # -----
 # change argument value
@@ -20,7 +21,6 @@ sudo apt-get install -y linux-headers-$(uname -r) falco
 # -----
 sudo sed -i 's/json_output: false/json_output: true/' /etc/falco/falco.yaml
 sudo sed -i 's/json_include_output_property: false/json_include_output_property: true/' /etc/falco/falco.yaml
-
 
 # -----
 # set falcos for sidekick
@@ -43,12 +43,7 @@ rm -f falcosidekick.tar.gz
 sudo mkdir -p /etc/falcosidekick
 
 # -----
-# set env
-# fill cred after launch instance
-# -----
-
-# -----
-# set loggroup/logstream
+# set loggroup/logstream (ลบตัวอักษรขยะออกให้แล้ว)
 # -----
 sudo bash -c 'cat << EOF > /etc/falcosidekick/config.yaml
 aws:
@@ -59,7 +54,7 @@ aws:
 EOF'
 
 # -----
-# set rules
+# set rules (ลบตัวอักษรขยะออกให้แล้ว)
 # -----
 sudo bash -c "cat << 'EOF' > /etc/falco/falco_rules.local.yaml
 # 1. ตรวจจับการวางหรือแก้ไขไฟล์ Executable ใต้ /bin, /sbin, /usr/bin บน Host
@@ -119,7 +114,14 @@ WantedBy=multi-user.target
 EOF'
 
 sudo systemctl daemon-reload
+
+# ปิด Service Falco ธรรมดาก่อน เพื่อไม่ให้แย่งกันทำงานกับ modern-bpf
+sudo systemctl stop falco || true
+sudo systemctl disable falco || true
+
+# เปิดใช้งาน Falco Modern BPF และ Sidekick
 sudo systemctl enable falco-modern-bpf
 sudo systemctl restart falco-modern-bpf
+
 sudo systemctl enable falcosidekick.service
 sudo systemctl restart falcosidekick
