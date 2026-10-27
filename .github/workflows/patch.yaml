@@ -21,25 +21,42 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Rollout ASG (Start Instance Refresh)
+      - name: Rollout ASG (Manual Replacement)
         run: |
           echo "Looking for ASG starting with: ${{ env.ASG_NAME_PREFIX }}..."
           
-          # 1. ให้ AWS CLI ค้นหาชื่อ ASG เต็มๆ จาก Prefix
+          # 1. Find the ASG name
           REAL_ASG_NAME=$(aws autoscaling describe-auto-scaling-groups \
             --query "AutoScalingGroups[?starts_with(AutoScalingGroupName, '${{ env.ASG_NAME_PREFIX }}')].AutoScalingGroupName" \
             --output text)
 
-          # 2. เช็กว่าหาเจอไหม
           if [ -z "$REAL_ASG_NAME" ] || [ "$REAL_ASG_NAME" == "None" ]; then
             echo "Error: Could not find any ASG with prefix '${{ env.ASG_NAME_PREFIX }}'"
             exit 1
           fi
 
           echo "Found Target ASG: $REAL_ASG_NAME"
-          echo "Starting ASG Instance Refresh..."
+          echo "Fetching attached instances..."
 
-          # 3. สั่ง Refresh โดยใช้ชื่อเต็มที่หามาได้
-          aws autoscaling start-instance-refresh \
-            --auto-scaling-group-name "$REAL_ASG_NAME" \
-            --preferences '{"MinHealthyPercentage": 50, "InstanceWarmup": 180}'
+          # 2. Get all Instance IDs in the ASG
+          INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups \
+            --auto-scaling-group-names "$REAL_ASG_NAME" \
+            --query "AutoScalingGroups[0].Instances[*].InstanceId" \
+            --output text)
+          
+          if [ -z "$INSTANCE_IDS" ] || [ "$INSTANCE_IDS" == "None" ]; then
+            echo "No instances found in ASG to replace."
+            exit 0
+          fi
+          
+          # 3. Terminate instances sequentially to force replacement
+          echo "Terminating instances: $INSTANCE_IDS"
+          for INSTANCE in $INSTANCE_IDS; do
+            echo "Terminating $INSTANCE..."
+            aws autoscaling terminate-instance-in-auto-scaling-group \
+              --instance-id "$INSTANCE" \
+              --no-should-decrement-desired-capacity
+            
+            # Wait 30 seconds between terminations to allow the new instance to boot
+            sleep 30 
+          done
