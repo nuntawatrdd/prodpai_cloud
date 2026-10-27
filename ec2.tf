@@ -104,11 +104,6 @@ resource "aws_launch_template" "prodpai_web_template" {
       }
     )
   }
-
-  lifecycle {
-    ignore_changes = [image_id]
-  }
-
 }
 
 # -----
