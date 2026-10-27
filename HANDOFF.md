@@ -60,9 +60,12 @@ Settings → Secrets and variables → Actions ของแต่ละ repo
   มันอ่านจาก S3 ที่ Lambda เขียนไว้ ไม่มี endpoint ให้ยิงข้อมูลเข้า
 - คีย์ AWS Academy หมดอายุทุก ~4 ชม. หมดแล้วต้องวางใหม่ทั้ง 3 ตัว ในทั้งสอง repo และใน `~/.aws/credentials`
 - **credentials ของ repo แอปต้องการมากกว่าแค่ push ECR แล้ว** เพราะ CI ทำ rollout เองหลัง push
-  แต่ต้องการแค่ 4 อย่าง ไม่ต้องมีสิทธิ์แก้ launch template แล้ว:
+  แต่ต้องการแค่ 5 อย่าง ไม่ต้องมีสิทธิ์แก้ launch template แล้ว:
   `ssm:PutParameter` (เฉพาะ `/prod-pai/app/image_tag`), `autoscaling:DescribeAutoScalingGroups`,
-  `autoscaling:DescribeInstanceRefreshes`, `autoscaling:StartInstanceRefresh`
+  `autoscaling:SetDesiredCapacity`, `autoscaling:TerminateInstanceInAutoScalingGroup`,
+  `elasticloadbalancing:DescribeTargetHealth`
+  ห้ามให้ `autoscaling:StartInstanceRefresh` — AWS Academy มี SCP deny คำสั่งนั้นอยู่แล้ว
+  `rollout_asg.sh` จึงเปิด/ปิดเครื่องเองแทน ให้ไปก็ไม่มีประโยชน์
   ใน AWS Academy ใช้คีย์ชุดเดียวกันอยู่แล้วจึงผ่าน แต่ถ้าส่งต่อให้คนนอกจริงๆ นี่คือการให้สิทธิ์แตะของที่รันอยู่
   ถ้าไม่อยากให้ ให้ลบ job `rollout` ออกจาก `ci.yml` แล้วกลับไปกด **Launch Image** เองที่ repo นี้แทน
 

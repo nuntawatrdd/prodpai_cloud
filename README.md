@@ -16,7 +16,7 @@ Terraform + GitHub Actions สำหรับวาง topology ทั้งช�
 ```
 repo แอป ── CI: test → Semgrep/Trivy/Gitleaks/hadolint → build → smoke → scan image → SBOM
                  └─ push ──▶ ECR (tag: commit SHA + latest)
-                 └─ rollout: ssm put-parameter → start-instance-refresh → ทยอยสลับเครื่อง
+                 └─ rollout: ssm put-parameter → scripts/rollout_asg.sh → ทยอยสลับเครื่อง
                     (เฉพาะ main เท่านั้น)
 ```
 
@@ -33,7 +33,7 @@ Actions → Infra Setup (กดเอง ครั้งแรกครั้ง
 
 Actions → Launch Image (กดเอง เมื่อต้องการย้อน tag เก่าหรือปล่อย tag ที่เลือกเอง)
    ├─ aws ssm put-parameter  /prod-pai/app/image_tag = <tag>
-   └─ aws autoscaling start-instance-refresh → ทยอยสลับเครื่องแบบ Rolling
+   └─ bash scripts/rollout_asg.sh → ทยอยสลับเครื่องแบบ Rolling (เปิดใหม่ก่อน ปิดเก่าทีหลัง)
 ```
 
 > ปกติไม่ต้องกด Launch Image แล้ว เพราะ CI ฝั่งแอปทำขั้นนี้ให้เองหลัง push ขึ้น ECR
@@ -59,6 +59,29 @@ Falco บนทุกเครื่อง ── Emergency/Alert/Critical ─�
                                      ├─ NACL deny IP/32 ทั้งขาเข้า-ขาออก (ตัด connection ที่เปิดค้าง)
                                      └─ ติด tag SecurityStatus=Compromised + เขียน incident ลง S3
 ```
+
+### ลำดับตอนตั้งระบบครั้งแรก
+
+สองฝั่งสลับกันไม่ได้ — **แอปก่อน อินฟราทีหลัง** เพราะ ASG ที่ไม่มี image ก็ไม่มีอะไรเสิร์ฟ:
+
+```
+1. repo แอป push เข้า main
+     ├─ job build/push → image <sha> + latest เข้า ECR
+     └─ job rollout    → warning "ยังไม่มี ASG" แล้วข้ามเอง   ← ปกติของรอบแรก ไม่ใช่ error
+
+2. repo นี้ → Actions → Infra Setup (image_tag=latest)
+     └─ เจอ image ใน ECR → terraform apply → ASG ขึ้นมาพร้อมแอป
+
+3. หลังจากนี้ไม่ต้องกด Infra Setup อีก — push ฝั่งแอปครั้งต่อไป
+   job rollout จะเจอ ASG แล้วสลับ image ให้เอง
+```
+
+นี่เป็น **ลำดับทางเดียว ไม่ใช่ deadlock** — ขั้น 1 ไม่ได้รอขั้น 2
+เพราะ job rollout ข้ามตัวเองเมื่อยังไม่มี ASG ขั้นตอนเต็มอยู่ข้อ 3
+
+> **อย่าหา placeholder image จากอินเทอร์เน็ตมาใส่เพื่อข้ามลำดับนี้** — มันผ่าน
+> health check ของ ALB ทำให้ stack ขึ้นเขียวทั้งที่เสิร์ฟของที่ไม่ใช่แอป ซึ่งคือเคสที่
+> `scripts/userdata.sh` ตั้งใจให้พังเสียงดังเพื่อหลีกเลี่ยง ("ดีกว่ารันเวอร์ชันผิด")
 
 | Repo | หน้าที่ | ใครรัน |
 |---|---|---|
@@ -177,12 +200,16 @@ curl -s "$(terraform output -raw dashboard_url)/health" # ต้องได้ 
 
 ```bash
 aws ssm put-parameter --name /prod-pai/app/image_tag --value <tag> --type String --overwrite
-aws autoscaling start-instance-refresh --auto-scaling-group-name <asg>   --preferences '{"MinHealthyPercentage":50,"InstanceWarmup":180}'
+bash scripts/rollout_asg.sh <asg>
 ```
 
-ASG ทยอยปิดเครื่องเก่าสร้างเครื่องใหม่ทีละส่วน เครื่องใหม่บูตมาอ่าน tag จาก SSM แล้ว
-`docker pull` ตัวนั้นมารันต่อทันที ไม่มีการลบเครื่องแล้วสร้างใหม่ทั้งชุด
-ถ้ามีรอบ refresh ค้างอยู่ workflow จะรอให้จบก่อนแทนที่จะยิงทับ
+**ไม่ใช่ `start-instance-refresh`** — AWS Academy มี SCP deny `autoscaling:StartInstanceRefresh`
+ไว้ (`ec2.tf:144`) `rollout_asg.sh` จึงทำเองด้วย `set-desired-capacity` +
+`terminate-instance-in-auto-scaling-group` — เปิดเครื่องใหม่รอให้ target group เขียวก่อน
+แล้วค่อยปิดเครื่องเก่าทีหลัง เว็บจึงไม่ล่มระหว่างสลับ
+
+เครื่องใหม่บูตมาอ่าน tag จาก SSM แล้ว `docker pull` ตัวนั้นมารันต่อทันที
+ไม่มีการลบเครื่องแล้วสร้างใหม่ทั้งชุด
 
 **ย้อนกลับ (rollback)** — Actions ของ repo นี้ → **Launch Image** → ใส่ tag เก่าที่อยากกลับไป
 
