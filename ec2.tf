@@ -11,11 +11,11 @@ data "aws_ami" "ubuntu" {
 }
 
 data "aws_ecr_repository" "app_repo" {
-  name = "prodpai_cloud"
+  name = "prodpai_cloudd"
 }
 
 data "aws_ecr_repository" "dashboard_repo" {
-  name = "prodpai_dashboard"
+  name = "prodpai_dashboardd"
 }
 
 # -----
