@@ -109,7 +109,7 @@ resource "aws_lambda_function" "infra_aggregator" {
 
   environment {
     variables = {
-      S3_BUCKET = "prod-pai-logs"
+      S3_BUCKET = "prod-pai-logss"
     }
   }
 }
