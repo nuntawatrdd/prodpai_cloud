@@ -81,10 +81,10 @@ resource "aws_launch_template" "prodpai_web_template" {
   image_id      = aws_ami_from_instance.web_ami.id
   instance_type = var.instance_type
   key_name      = aws_key_pair.deployer.key_name
-  user_data = base64encode(templatefile("${path.module}/scripts/userdata.sh", {
+  user_data = base64encode(replace(templatefile("${path.module}/scripts/userdata.sh", {
     IMAGE_TAG = var.image_tag
     ECR_URL   = data.aws_ecr_repository.app_repo.repository_url
-  }))
+  }), "\r\n", "\n"))
 
   iam_instance_profile {
     name = "LabInstanceProfile"
@@ -154,13 +154,13 @@ resource "aws_instance" "dashboard" {
 
 
   # โหลด Script ของ Ubuntu
-  user_data = templatefile("${path.module}/scripts/setup_dashboard.sh", {
+  user_data = replace(templatefile("${path.module}/scripts/setup_dashboard.sh", {
     IMAGE_TAG   = var.image_tag
     ECR_URL     = data.aws_ecr_repository.dashboard_repo.repository_url
     S3_BUCKET   = "prod-pai-logs"
     LAMBDA_NAME = aws_lambda_function.infra_aggregator.function_name
     AWS_REGION  = var.aws_region
-  })
+  }), "\r\n", "\n")
 
   depends_on = [
     aws_nat_gateway.nat,                # เปลี่ยนชื่อ resource ให้ตรงกับของคุณ
