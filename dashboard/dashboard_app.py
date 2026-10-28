@@ -19,7 +19,7 @@ import time
 
 app = Flask(__name__)
 
-S3_BUCKET = os.environ.get("INFRA_S3_BUCKET", "prod-pai-logs")
+S3_BUCKET = os.environ.get("INFRA_S3_BUCKET", "prod-pai-logss")
 S3_KEY = os.environ.get("INFRA_S3_KEY", "dashboard/current_infra.json")
 LAMBDA_NAME = os.environ.get("INFRA_LAMBDA_NAME", "prod-pai-Infra-Aggregator")
 AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
